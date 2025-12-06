@@ -5,7 +5,7 @@ import { User } from '../types';
 
 interface Props {
   onLogin: (user: User) => void;
-  users: any[]; // Correctly typed as array of user objects
+  users: any[];
 }
 
 const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
@@ -27,15 +27,12 @@ const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
     setError('');
     setLoading(true);
 
-    // Simulate network delay
     setTimeout(() => {
-      // Find user by username/password.
-      // Note: We use stable ID for session, but match on username for login.
       const userRecord = users.find((u: any) => u.username === username && u.password === password);
 
       if (userRecord) {
         onLogin({
-          id: userRecord.id, // Using stable ID instead of username
+          id: userRecord.id,
           username: userRecord.username,
           name: userRecord.name,
           role: userRecord.role,
@@ -55,14 +52,12 @@ const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
     setRecoveryStatus('sending');
 
     setTimeout(() => {
-        // Check if email corresponds to a user (mock check)
         const user = users.find((u: any) => u.email === recoveryEmail || u.username === recoveryEmail);
         
         if (user && user.email) {
             setRecoveryStatus('success');
             setRecoveryMessage(`Enviamos um link de redefinição de senha para ${user.email}`);
         } else {
-            // For security/simplicity, we show a generic success message or specific if preferred.
             setRecoveryStatus('success');
             setRecoveryMessage(`Se existir uma conta para "${recoveryEmail}", enviamos um link de redefinição.`);
         }
@@ -71,7 +66,6 @@ const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
 
   return (
     <div className="h-screen w-full bg-[#191919] flex items-center justify-center relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-purple-900/20 rounded-full blur-[100px]"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[100px]"></div>
 
@@ -80,7 +74,6 @@ const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
         {view === 'login' ? (
           <>
             <div className="text-center mb-8">
-               {/* No footer icon/text here per previous request */}
                <h1 className="text-2xl font-bold text-white mb-2">Bem-vindo de volta</h1>
                <p className="text-gray-400 text-sm">Insira suas credenciais para acessar o AJM OneSystem</p>
             </div>
