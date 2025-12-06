@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { KanbanColumn, Task, Attachment } from '../types';
-import { Plus, X, MoreHorizontal, AlignLeft, Calendar, User, Clock, Trash2, Smile, Palette, Paperclip, File as FileIcon, Check } from 'lucide-react';
+import { Plus, X, MoreHorizontal, AlignLeft, Calendar, User, Clock, Trash2, Smile, Palette, Paperclip, File as FileIcon, Check, GripVertical } from 'lucide-react';
 
 interface Props {
   data: KanbanColumn[];
@@ -220,6 +220,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, columnTitle, onClose, onDel
 
 const KanbanBoard: React.FC<Props> = ({ data, onChange }) => {
   const [draggedItem, setDraggedItem] = useState<{ taskId: string, colId: string } | null>(null);
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<{ colId: string, task: Task } | null>(null);
   const [openColorMenu, setOpenColorMenu] = useState<string | null>(null);
   
@@ -227,42 +228,74 @@ const KanbanBoard: React.FC<Props> = ({ data, onChange }) => {
   const [addingColumnId, setAddingColumnId] = useState<string | null>(null);
   const [newItemText, setNewItemText] = useState('');
 
-  const handleDragStart = (taskId: string, colId: string) => {
+  // --- Task DnD ---
+  const handleTaskDragStart = (e: React.DragEvent, taskId: string, colId: string) => {
+    e.stopPropagation(); // Prevent column dragging
     setDraggedItem({ taskId, colId });
+  };
+
+  // --- Column DnD ---
+  const handleColumnDragStart = (e: React.DragEvent, colId: string) => {
+    setDraggedColId(colId);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
-  const handleDrop = (targetColId: string) => {
-    if (!draggedItem) return;
+  const handleDrop = (e: React.DragEvent, targetColId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-    const sourceColIndex = data.findIndex(c => c.id === draggedItem.colId);
-    const targetColIndex = data.findIndex(c => c.id === targetColId);
+    // 1. Column Reordering
+    if (draggedColId) {
+        if (draggedColId === targetColId) {
+            setDraggedColId(null);
+            return;
+        }
 
-    if (sourceColIndex === -1 || targetColIndex === -1) return;
+        const oldIndex = data.findIndex(c => c.id === draggedColId);
+        const newIndex = data.findIndex(c => c.id === targetColId);
 
-    const newData = [...data];
-    const sourceCol = { ...newData[sourceColIndex] };
-    const targetCol = { ...newData[targetColIndex] };
+        if (oldIndex === -1 || newIndex === -1) return;
 
-    const taskIndex = sourceCol.tasks.findIndex(t => t.id === draggedItem.taskId);
-    if (taskIndex === -1) return;
-    
-    const [task] = sourceCol.tasks.splice(taskIndex, 1);
-
-    if (sourceCol.id === targetCol.id) {
-       sourceCol.tasks.push(task);
-       newData[sourceColIndex] = sourceCol;
-    } else {
-       targetCol.tasks.push(task);
-       newData[sourceColIndex] = sourceCol;
-       newData[targetColIndex] = targetCol;
+        const newData = [...data];
+        const [movedCol] = newData.splice(oldIndex, 1);
+        newData.splice(newIndex, 0, movedCol);
+        
+        onChange(newData);
+        setDraggedColId(null);
+        return;
     }
 
-    onChange(newData);
-    setDraggedItem(null);
+    // 2. Task Moving
+    if (draggedItem) {
+        const sourceColIndex = data.findIndex(c => c.id === draggedItem.colId);
+        const targetColIndex = data.findIndex(c => c.id === targetColId);
+
+        if (sourceColIndex === -1 || targetColIndex === -1) return;
+
+        const newData = [...data];
+        const sourceCol = { ...newData[sourceColIndex] };
+        const targetCol = { ...newData[targetColIndex] };
+
+        const taskIndex = sourceCol.tasks.findIndex(t => t.id === draggedItem.taskId);
+        if (taskIndex === -1) return;
+        
+        const [task] = sourceCol.tasks.splice(taskIndex, 1);
+
+        if (sourceCol.id === targetCol.id) {
+           sourceCol.tasks.push(task);
+           newData[sourceColIndex] = sourceCol;
+        } else {
+           targetCol.tasks.push(task);
+           newData[sourceColIndex] = sourceCol;
+           newData[targetColIndex] = targetCol;
+        }
+
+        onChange(newData);
+        setDraggedItem(null);
+    }
   };
 
   const confirmAddTask = () => {
@@ -329,10 +362,12 @@ const KanbanBoard: React.FC<Props> = ({ data, onChange }) => {
         {data.map(column => (
           <div 
             key={column.id}
-            className="min-w-[280px] w-[280px] rounded-md flex flex-col max-h-full border border-[#333] transition-colors relative"
+            draggable={!addingColumnId} // Only draggable if not editing
+            onDragStart={(e) => handleColumnDragStart(e, column.id)}
+            className={`min-w-[280px] w-[280px] rounded-md flex flex-col max-h-full border border-[#333] transition-all relative ${draggedColId === column.id ? 'opacity-50 cursor-grabbing' : ''}`}
             style={{ backgroundColor: '#202020e6' }} // Slight transparency for background
             onDragOver={handleDragOver}
-            onDrop={() => handleDrop(column.id)}
+            onDrop={(e) => handleDrop(e, column.id)}
           >
             {/* Color Strip if colored */}
             <div 
@@ -340,8 +375,8 @@ const KanbanBoard: React.FC<Props> = ({ data, onChange }) => {
                 style={{ backgroundColor: column.color === 'transparent' ? 'transparent' : column.color }}
             />
 
-            <div className="p-3 flex justify-between items-center border-b border-[#333]">
-              <h3 className="font-semibold text-sm text-gray-300 flex items-center gap-2">
+            <div className="p-3 flex justify-between items-center border-b border-[#333] cursor-grab active:cursor-grabbing">
+              <h3 className="font-semibold text-sm text-gray-300 flex items-center gap-2 select-none">
                 <div 
                     className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: column.color && column.color !== 'transparent' ? column.color : '#2383E2' }}
@@ -350,14 +385,14 @@ const KanbanBoard: React.FC<Props> = ({ data, onChange }) => {
                 <span className="text-notion-muted font-normal ml-1 text-xs">{column.tasks.length}</span>
               </h3>
               <div className="flex gap-1 text-notion-muted cursor-pointer hover:text-white relative">
-                  <Plus size={16} onClick={() => { setAddingColumnId(column.id); setNewItemText(''); }}/>
-                  <div onClick={() => setOpenColorMenu(openColorMenu === column.id ? null : column.id)}>
+                  <Plus size={16} onClick={(e) => { e.stopPropagation(); setAddingColumnId(column.id); setNewItemText(''); }}/>
+                  <div onClick={(e) => { e.stopPropagation(); setOpenColorMenu(openColorMenu === column.id ? null : column.id); }}>
                       <MoreHorizontal size={16} />
                   </div>
                   
                   {/* Column Menu */}
                   {openColorMenu === column.id && (
-                      <div className="absolute top-6 left-0 z-20 bg-[#2C2C2C] border border-[#444] rounded shadow-xl p-2 min-w-[120px]">
+                      <div className="absolute top-6 left-0 z-20 bg-[#2C2C2C] border border-[#444] rounded shadow-xl p-2 min-w-[120px] cursor-default" onClick={e => e.stopPropagation()}>
                           <div className="text-xs text-notion-muted mb-2 font-semibold">COR DO CABEÇALHO</div>
                           <div className="flex gap-1 flex-wrap w-[120px]">
                               {COLUMN_COLORS.map(c => (
@@ -377,12 +412,12 @@ const KanbanBoard: React.FC<Props> = ({ data, onChange }) => {
               </div>
             </div>
 
-            <div className="p-2 flex-1 overflow-y-auto space-y-2 min-h-[100px]">
+            <div className="p-2 flex-1 overflow-y-auto space-y-2 min-h-[100px] cursor-default">
               {column.tasks.map(task => (
                 <div
                   key={task.id}
                   draggable
-                  onDragStart={() => handleDragStart(task.id, column.id)}
+                  onDragStart={(e) => handleTaskDragStart(e, task.id, column.id)}
                   onClick={() => setEditingTask({ colId: column.id, task })}
                   className="bg-notion-card p-3 rounded shadow-sm hover:bg-notion-hover cursor-pointer active:cursor-grabbing border border-transparent hover:border-[#444] group relative"
                 >
