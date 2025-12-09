@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, User as UserIcon, ArrowRight, Mail, ArrowLeft, Check } from 'lucide-react';
 import { User } from '../types';
@@ -185,17 +184,38 @@ const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
     }, 800);
   };
 
-  const handleRecoverySubmit = (e: React.FormEvent) => {
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoveryEmail) return;
     setRecoveryStatus('sending');
 
+    // 1. Try Backend API
+    try {
+        const response = await fetch('http://localhost:3001/api/recover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: recoveryEmail }),
+            signal: AbortSignal.timeout(3000)
+        });
+
+        if (response.ok) {
+            setTimeout(() => {
+                setRecoveryStatus('success');
+                setRecoveryMessage(`Enviamos um email para ${recoveryEmail} com as instruções de recuperação.`);
+            }, 500);
+            return;
+        }
+    } catch (err) {
+        console.warn("Backend API unavailable for recovery, falling back to local simulation.");
+    }
+
+    // 2. Fallback Simulation (if backend is down)
     setTimeout(() => {
         const user = users.find((u: any) => u.email === recoveryEmail || u.username === recoveryEmail);
         
         if (user && user.email) {
             setRecoveryStatus('success');
-            setRecoveryMessage(`Enviamos um link de redefinição de senha para ${user.email}`);
+            setRecoveryMessage(`(Offline) Simulação: Email enviado para ${user.email}`);
         } else {
             setRecoveryStatus('success');
             setRecoveryMessage(`Se existir uma conta para "${recoveryEmail}", enviamos um link de redefinição.`);

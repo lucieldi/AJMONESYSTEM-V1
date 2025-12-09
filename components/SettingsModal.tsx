@@ -21,12 +21,17 @@ type Tab = 'users' | 'security' | 'appearance';
 const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onUpdateUser, onDeleteUser, currentUserId, currentUser, appSettings, setAppSettings }) => {
   const [activeTab, setActiveTab] = useState<Tab>(currentUser.role === 'admin' ? 'users' : 'appearance');
   
-  // Update active tab if user role is not admin and they are on a restricted tab
+  // Initialize state when modal opens
   useEffect(() => {
-    if (isOpen && currentUser.role !== 'admin' && activeTab === 'users') {
-        setActiveTab('appearance');
-    }
-  }, [isOpen, currentUser.role, activeTab]);
+      if (isOpen) {
+          if (currentUser.role !== 'admin' && activeTab === 'users') {
+              // Standard users default to editing their own profile in the 'users' tab if active
+              handleEditClick(currentUser);
+          } else if (currentUser.role === 'admin') {
+              resetForm();
+          }
+      }
+  }, [isOpen, currentUser]);
 
   // User Management State
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -50,6 +55,13 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
           } else {
               setRecoveryEmail(currentUser.email || '');
           }
+      }
+  }, [activeTab, currentUser]);
+
+  // If user switches to 'users' tab and is not admin, ensure they are editing themselves
+  useEffect(() => {
+      if (activeTab === 'users' && currentUser.role !== 'admin') {
+          handleEditClick(currentUser);
       }
   }, [activeTab, currentUser]);
 
@@ -97,13 +109,19 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
             (updatePayload as any).password = password;
         }
         onUpdateUser(updatePayload as any);
+        
+        // If not admin, give feedback but stay on form
+        if (currentUser.role !== 'admin') {
+             // Maybe show a checkmark or toast, for now just no reset
+        } else {
+            resetForm();
+        }
     } else {
         // Registration Flow
         if (!password) return; 
         onAddUser({ ...baseUserData, password });
+        resetForm();
     }
-
-    resetForm();
   };
 
   const handleSendRecovery = () => {
@@ -134,14 +152,12 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                 <p className="text-xs text-notion-muted">Painel de Controle</p>
             </div>
             <div className="p-2 space-y-1">
-                {currentUser.role === 'admin' && (
-                    <button 
-                        onClick={() => setActiveTab('users')}
-                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-md transition-colors ${activeTab === 'users' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-[#333]'}`}
-                    >
-                        <Users size={18} /> Gerenciamento de Usuários
-                    </button>
-                )}
+                <button 
+                    onClick={() => setActiveTab('users')}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-md transition-colors ${activeTab === 'users' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-[#333]'}`}
+                >
+                    <Users size={18} /> {currentUser.role === 'admin' ? 'Gerenciamento de Usuários' : 'Meu Perfil'}
+                </button>
                 <button 
                     onClick={() => setActiveTab('security')}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-md transition-colors ${activeTab === 'security' ? 'bg-green-600/20 text-green-400' : 'text-gray-400 hover:text-white hover:bg-[#333]'}`}
@@ -165,16 +181,18 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto bg-[#151515] p-8">
             
-            {/* --- TAB: USER MANAGEMENT --- */}
-            {activeTab === 'users' && currentUser.role === 'admin' && (
+            {/* --- TAB: USER MANAGEMENT / MY PROFILE --- */}
+            {activeTab === 'users' && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                    <h2 className="text-xl font-bold text-white mb-6">Gerenciamento de Usuários</h2>
+                    <h2 className="text-xl font-bold text-white mb-6">
+                        {currentUser.role === 'admin' ? 'Gerenciamento de Usuários' : 'Meu Perfil'}
+                    </h2>
                     
                     {/* Add/Edit Form */}
                     <div className="bg-[#202020] rounded-lg border border-[#333] p-6 mb-8">
                         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                             {editingUserId ? <Edit2 size={16} /> : <UserPlus size={16} />} 
-                            {editingUserId ? 'Editar Usuário' : 'Registrar Novo Usuário'}
+                            {editingUserId ? (currentUser.role === 'admin' ? 'Editar Usuário' : 'Editar Meus Dados') : 'Registrar Novo Usuário'}
                         </h3>
                         <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
                             <div className="col-span-1 space-y-1">
@@ -183,7 +201,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             </div>
                             <div className="col-span-1 space-y-1">
                                 <label className="text-xs text-notion-muted">Usuário</label>
-                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="ex: joao" />
+                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="ex: joao" disabled={currentUser.role !== 'admin' && editingUserId !== null} />
                             </div>
                             <div className="col-span-2 space-y-1">
                                 <label className="text-xs text-notion-muted">Endereço de Email</label>
@@ -198,7 +216,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                                 <select 
                                     value={role} 
                                     onChange={e => setRole(e.target.value as UserRole)} 
-                                    disabled={editingUserId === 'admin' || editingUserId === currentUserId}
+                                    disabled={currentUser.role !== 'admin'} // Standard users cannot change their own role
                                     className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <option value="user">Usuário Padrão</option>
@@ -207,49 +225,51 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             </div>
                             
                             <div className="col-span-2 flex justify-end gap-2 mt-2">
-                                {editingUserId && (
+                                {editingUserId && currentUser.role === 'admin' && (
                                     <button type="button" onClick={resetForm} className="text-gray-400 hover:text-white px-4 py-2 text-sm">Cancelar</button>
                                 )}
                                 <button type="submit" disabled={!name || !username || (!editingUserId && !password)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-lg">
-                                    {editingUserId ? 'Atualizar Usuário' : 'Criar Usuário'}
+                                    {editingUserId ? 'Salvar Alterações' : 'Criar Usuário'}
                                 </button>
                             </div>
                         </form>
                     </div>
 
-                    {/* User List */}
-                    <div className="bg-[#202020] rounded-lg border border-[#333] overflow-hidden">
-                        {users.map(user => (
-                            <div key={user.id} className="p-4 border-b border-[#333] last:border-0 flex items-center justify-between hover:bg-[#252525] transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg">{user.avatar}</div>
-                                    <div>
-                                        <div className="font-medium text-white flex items-center gap-2">
-                                            {user.name} 
-                                            {user.role === 'admin' && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 rounded border border-blue-500/20">ADMIN</span>}
+                    {/* User List - Only visible to Admins */}
+                    {currentUser.role === 'admin' && (
+                        <div className="bg-[#202020] rounded-lg border border-[#333] overflow-hidden">
+                            {users.map(user => (
+                                <div key={user.id} className="p-4 border-b border-[#333] last:border-0 flex items-center justify-between hover:bg-[#252525] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg">{user.avatar}</div>
+                                        <div>
+                                            <div className="font-medium text-white flex items-center gap-2">
+                                                {user.name} 
+                                                {user.role === 'admin' && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 rounded border border-blue-500/20">ADMIN</span>}
+                                            </div>
+                                            <div className="text-xs text-gray-500">{user.email || 'Sem email'} • @{user.username}</div>
                                         </div>
-                                        <div className="text-xs text-gray-500">{user.email || 'Sem email'} • @{user.username}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {deleteConfirmId === user.id ? (
+                                            <div className="flex gap-2">
+                                                <button onClick={() => onDeleteUser(user.id)} className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-1 rounded">Confirmar</button>
+                                                <button onClick={() => setDeleteConfirmId(null)} className="bg-[#333] text-white text-xs px-2 py-1 rounded">Cancelar</button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => handleEditClick(user)} className="p-2 text-gray-400 hover:text-blue-400"><Edit2 size={16}/></button>
+                                                {/* Prevent deleting yourself OR the root admin user */}
+                                                {user.id !== currentUserId && user.id !== 'admin' && (
+                                                    <button onClick={() => setDeleteConfirmId(user.id)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16}/></button>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    {deleteConfirmId === user.id ? (
-                                        <div className="flex gap-2">
-                                            <button onClick={() => onDeleteUser(user.id)} className="bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-1 rounded">Confirmar</button>
-                                            <button onClick={() => setDeleteConfirmId(null)} className="bg-[#333] text-white text-xs px-2 py-1 rounded">Cancelar</button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <button onClick={() => handleEditClick(user)} className="p-2 text-gray-400 hover:text-blue-400"><Edit2 size={16}/></button>
-                                            {/* Prevent deleting yourself OR the root admin user */}
-                                            {user.id !== currentUserId && user.id !== 'admin' && (
-                                                <button onClick={() => setDeleteConfirmId(user.id)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16}/></button>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 

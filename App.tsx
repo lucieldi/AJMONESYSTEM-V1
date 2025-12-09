@@ -313,7 +313,7 @@ function App() {
   };
 
   const handleCreateProject = () => {
-    if (!isAdmin) return;
+    // Removed isAdmin check to allow all users to create projects
     const newProject: Project = {
       id: crypto.randomUUID(),
       title: 'Sem Título',
@@ -339,12 +339,7 @@ function App() {
   };
 
   const handleCreateTemplateProject = (type: 'kanban' | 'ishikawa') => {
-    if (!isAdmin) {
-        setToast({ message: 'Apenas administradores podem criar projetos.' });
-        setTimeout(() => setToast(null), 3000);
-        return;
-    }
-
+    // Removed isAdmin check and error toast
     const newProject: Project = {
       id: crypto.randomUUID(),
       title: type === 'kanban' ? 'Tutorial Kanban' : 'Tutorial Ishikawa',
@@ -401,7 +396,7 @@ function App() {
   };
 
   const toggleProjectStatus = (id: string) => {
-      if (!isAdmin) return; 
+      // Removed isAdmin check to allow users to archive/restore
       const project = projects.find(p => p.id === id);
       if (!project) return;
       
@@ -597,7 +592,7 @@ function App() {
         {/* ACTIVE PROJECTS */}
         <div className="text-xs font-semibold text-notion-muted mb-2 flex justify-between items-center">
             <span>LISTAS</span>
-            {isAdmin && <Plus size={14} className="cursor-pointer hover:text-white" onClick={handleCreateProject}/>}
+            <Plus size={14} className="cursor-pointer hover:text-white" onClick={handleCreateProject}/>
         </div>
         <div className="space-y-0.5 mb-6">
           {activeProjects.map(p => (
@@ -646,15 +641,13 @@ function App() {
                             >
                             <span className="text-base grayscale">{p.icon}</span>
                             <span className="truncate flex-1 line-through decoration-white/20">{p.title}</span>
-                            {isAdmin && (
-                                <div 
-                                    onClick={(e) => { e.stopPropagation(); toggleProjectStatus(p.id); }}
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#444] rounded text-notion-muted hover:text-green-400 transition-all"
-                                    title="Restaurar projeto"
-                                >
-                                    <RotateCcw size={12}/>
-                                </div>
-                            )}
+                             <div 
+                                onClick={(e) => { e.stopPropagation(); toggleProjectStatus(p.id); }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#444] rounded text-notion-muted hover:text-green-400 transition-all"
+                                title="Restaurar projeto"
+                            >
+                                <RotateCcw size={12}/>
+                            </div>
                             </div>
                         ))}
                     </div>
@@ -761,15 +754,14 @@ function App() {
              </div>
            </div>
         ))}
-        {isAdmin && (
-            <div 
-                onClick={handleCreateProject}
-                className="bg-notion-card p-4 rounded-lg hover:bg-notion-hover cursor-pointer group flex flex-col items-center justify-center text-notion-muted hover:text-white h-32 border border-dashed border-[#444] hover:border-gray-500"
-            >
-                <Plus size={24} className="mb-2"/>
-                <span className="text-sm">Novo Projeto</span>
-            </div>
-        )}
+        {/* New Project Card - Accessible to all */}
+        <div 
+            onClick={handleCreateProject}
+            className="bg-notion-card p-4 rounded-lg hover:bg-notion-hover cursor-pointer group flex flex-col items-center justify-center text-notion-muted hover:text-white h-32 border border-dashed border-[#444] hover:border-gray-500"
+        >
+            <Plus size={24} className="mb-2"/>
+            <span className="text-sm">Novo Projeto</span>
+        </div>
       </div>
 
       <div className="mb-8">
@@ -833,113 +825,110 @@ function App() {
                 {currentProject.status === 'completed' && (
                     <div className="flex items-center gap-2">
                             <span className="bg-orange-500/20 text-orange-400 text-[10px] px-1.5 py-0.5 rounded border border-orange-500/30 select-none">ARQUIVADO</span>
-                            {isAdmin && (
-                                <button 
-                                    onClick={() => toggleProjectStatus(currentProject.id)}
-                                    className="flex items-center gap-1 bg-white/5 hover:bg-white/10 text-[10px] text-notion-muted hover:text-white px-2 py-0.5 rounded transition-colors border border-white/5 hover:border-white/10"
-                                    title="Restaurar projeto"
-                                >
-                                    <RotateCcw size={10}/> Restaurar
-                                </button>
-                            )}
+                            {/* Allow anyone to restore if they have access */}
+                            <button 
+                                onClick={() => toggleProjectStatus(currentProject.id)}
+                                className="flex items-center gap-1 bg-white/5 hover:bg-white/10 text-[10px] text-notion-muted hover:text-white px-2 py-0.5 rounded transition-colors border border-white/5 hover:border-white/10"
+                                title="Restaurar projeto"
+                            >
+                                <RotateCcw size={10}/> Restaurar
+                            </button>
                     </div>
                 )}
             </div>
             <div className="flex items-center gap-3 relative">
                 <span className="text-xs text-notion-muted">Editado {currentProject.updatedAt.toLocaleTimeString()}</span>
                 
-                {/* Customization Menu */}
-                {isAdmin && (
-                    <div className="relative" ref={styleMenuRef}>
-                            <button 
-                                onClick={() => setShowStyleMenu(!showStyleMenu)}
-                                className="text-notion-muted hover:text-white p-1 hover:bg-white/10 rounded"
-                            >
-                                <MoreHorizontal size={18}/>
-                            </button>
-                            {showStyleMenu && (
-                                <div className="absolute right-0 top-8 w-72 bg-[#2C2C2C] border border-[#444] rounded-lg shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-4">
-                                    {/* Cover Image Section */}
-                                    <div>
-                                        <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
-                                            <ImageIcon size={12}/> Imagem de Capa
-                                        </div>
-                                        <div className="grid grid-cols-5 gap-1 mb-2">
-                                            {COVERS.map((cover, i) => (
-                                                <div 
-                                                    key={i}
-                                                    onClick={() => updateProject(currentProject.id, { cover: cover === '#2C2C2C' ? undefined : cover })}
-                                                    className="h-8 rounded cursor-pointer hover:ring-2 ring-white/50 transition-all border border-white/10"
-                                                    style={{ background: cover }}
-                                                    title="Alterar Capa"
-                                                />
-                                            ))}
-                                        </div>
+                {/* Customization Menu - Accessible to all */}
+                <div className="relative" ref={styleMenuRef}>
+                        <button 
+                            onClick={() => setShowStyleMenu(!showStyleMenu)}
+                            className="text-notion-muted hover:text-white p-1 hover:bg-white/10 rounded"
+                        >
+                            <MoreHorizontal size={18}/>
+                        </button>
+                        {showStyleMenu && (
+                            <div className="absolute right-0 top-8 w-72 bg-[#2C2C2C] border border-[#444] rounded-lg shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-4">
+                                {/* Cover Image Section */}
+                                <div>
+                                    <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
+                                        <ImageIcon size={12}/> Imagem de Capa
+                                    </div>
+                                    <div className="grid grid-cols-5 gap-1 mb-2">
+                                        {COVERS.map((cover, i) => (
+                                            <div 
+                                                key={i}
+                                                onClick={() => updateProject(currentProject.id, { cover: cover === '#2C2C2C' ? undefined : cover })}
+                                                className="h-8 rounded cursor-pointer hover:ring-2 ring-white/50 transition-all border border-white/10"
+                                                style={{ background: cover }}
+                                                title="Alterar Capa"
+                                            />
+                                        ))}
+                                    </div>
+                                    <button 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-full text-xs text-notion-muted hover:text-white bg-[#333] hover:bg-[#444] border border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors mb-2"
+                                    >
+                                        <Upload size={12}/> Carregar Personalizada
+                                    </button>
+                                    {/* Only show Reposition if it's an image (URL) */}
+                                    {getCoverUrl(currentProject.cover) && (
                                         <button 
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="w-full text-xs text-notion-muted hover:text-white bg-[#333] hover:bg-[#444] border border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors mb-2"
+                                            onClick={() => {
+                                                const url = getCoverUrl(currentProject.cover);
+                                                if(url) {
+                                                    setPendingUpload(url); 
+                                                    setShowStyleMenu(false);
+                                                }
+                                            }}
+                                            className="w-full text-xs text-notion-muted hover:text-white bg-[#333] hover:bg-[#444] border border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors"
                                         >
-                                            <Upload size={12}/> Carregar Personalizada
+                                            <MoveVertical size={12}/> Reposicionar
                                         </button>
-                                        {/* Only show Reposition if it's an image (URL) */}
-                                        {getCoverUrl(currentProject.cover) && (
-                                            <button 
-                                                onClick={() => {
-                                                    const url = getCoverUrl(currentProject.cover);
-                                                    if(url) {
-                                                        setPendingUpload(url); 
-                                                        setShowStyleMenu(false);
-                                                    }
-                                                }}
-                                                className="w-full text-xs text-notion-muted hover:text-white bg-[#333] hover:bg-[#444] border border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors"
-                                            >
-                                                <MoveVertical size={12}/> Reposicionar
-                                            </button>
-                                        )}
-                                        <input 
-                                            type="file" 
-                                            ref={fileInputRef} 
-                                            className="hidden" 
-                                            accept="image/*"
-                                            onChange={handleFileSelect}
-                                        />
-                                    </div>
+                                    )}
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*"
+                                        onChange={handleFileSelect}
+                                    />
+                                </div>
 
-                                    {/* Cover Text Section */}
-                                    <div>
-                                        <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
-                                            <Type size={12}/> Texto do Banner
-                                        </div>
-                                        <input 
-                                            type="text"
-                                            placeholder="Adicione texto ao banner..."
-                                            className="w-full bg-[#191919] border border-[#444] rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:border-blue-500 outline-none"
-                                            value={currentProject.coverText || ''}
-                                            onChange={(e) => updateProject(currentProject.id, { coverText: e.target.value })}
-                                        />
+                                {/* Cover Text Section */}
+                                <div>
+                                    <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
+                                        <Type size={12}/> Texto do Banner
                                     </div>
+                                    <input 
+                                        type="text"
+                                        placeholder="Adicione texto ao banner..."
+                                        className="w-full bg-[#191919] border border-[#444] rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:border-blue-500 outline-none"
+                                        value={currentProject.coverText || ''}
+                                        onChange={(e) => updateProject(currentProject.id, { coverText: e.target.value })}
+                                    />
+                                </div>
 
-                                    {/* Theme Section */}
-                                    <div>
-                                        <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
-                                            <Palette size={12}/> Tema de Fundo
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {THEMES.map((theme, i) => (
-                                                <div 
-                                                    key={i}
-                                                    onClick={() => updateProject(currentProject.id, { theme })}
-                                                    className="w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform border border-white/20"
-                                                    style={{ background: theme }}
-                                                    title="Alterar Tema"
-                                                />
-                                            ))}
-                                        </div>
+                                {/* Theme Section */}
+                                <div>
+                                    <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
+                                        <Palette size={12}/> Tema de Fundo
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {THEMES.map((theme, i) => (
+                                            <div 
+                                                key={i}
+                                                onClick={() => updateProject(currentProject.id, { theme })}
+                                                className="w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform border border-white/20"
+                                                style={{ background: theme }}
+                                                title="Alterar Tema"
+                                            />
+                                        ))}
                                     </div>
                                 </div>
-                            )}
-                    </div>
-                )}
+                            </div>
+                        )}
+                </div>
             </div>
             </div>
         )}
@@ -964,31 +953,30 @@ function App() {
                         </div>
                     )}
                     
-                    {isAdmin && (
-                        <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                             {getCoverUrl(currentProject.cover) && (
-                                <button 
-                                    onClick={(e) => {
-                                         e.stopPropagation();
-                                         const url = getCoverUrl(currentProject.cover);
-                                         if(url) setPendingUpload(url);
-                                    }}
-                                    className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
-                                >
-                                    <MoveVertical size={14} /> Reposicionar
-                                </button>
-                             )}
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); setShowStyleMenu(true); }}
+                    {/* Controls accessible to everyone */}
+                    <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            {getCoverUrl(currentProject.cover) && (
+                            <button 
+                                onClick={(e) => {
+                                        e.stopPropagation();
+                                        const url = getCoverUrl(currentProject.cover);
+                                        if(url) setPendingUpload(url);
+                                }}
                                 className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
-                             >
-                                 <ImageIcon size={14} /> Alterar Capa
-                             </button>
-                        </div>
-                    )}
+                            >
+                                <MoveVertical size={14} /> Reposicionar
+                            </button>
+                            )}
+                            <button 
+                            onClick={(e) => { e.stopPropagation(); setShowStyleMenu(true); }}
+                            className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
+                            >
+                                <ImageIcon size={14} /> Alterar Capa
+                            </button>
+                    </div>
                 </div>
             ) : (
-                <div className="h-12 w-full group-hover:bg-white/5 transition-colors flex items-center px-12 text-sm text-notion-muted opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => isAdmin && setShowStyleMenu(true)}>
+                <div className="h-12 w-full group-hover:bg-white/5 transition-colors flex items-center px-12 text-sm text-notion-muted opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => setShowStyleMenu(true)}>
                     <ImageIcon size={14} className="mr-2"/> Adicionar Capa
                 </div>
             )}
@@ -1002,7 +990,6 @@ function App() {
                     value={currentProject.title}
                     onChange={(e) => updateProject(currentProject.id, { title: e.target.value })}
                     placeholder="Sem Título"
-                    disabled={!isAdmin}
                  />
             </div>
 
