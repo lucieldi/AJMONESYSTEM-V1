@@ -30,6 +30,12 @@ export interface Attachment {
   type: 'image' | 'file';
 }
 
+export interface Tag {
+  id: string;
+  text: string;
+  color: string; // Hex code
+}
+
 export interface Task {
   id: string;
   content: string;
@@ -37,7 +43,9 @@ export interface Task {
   dueDate?: string;
   assignee?: string;
   icon?: string;
+  tags?: Tag[]; // Added tags
   attachments?: Attachment[];
+  documents?: Attachment[]; // New field for specific document submissions
   storyPoints?: number; // For Scrum
   priority?: 'Low' | 'Medium' | 'High'; // For Scrum
 }
@@ -97,4 +105,15 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-export type NavigationState = 'HOME' | 'PROJECT' | 'ADMIN_DASHBOARD';
+export interface SupportTicket {
+  id: string;
+  title: string;
+  description: string;
+  category: 'Hardware' | 'Software' | 'Network' | 'Access' | 'Other';
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Open' | 'In Progress' | 'Resolved';
+  createdBy: string; // User Name
+  createdAt: string;
+}
+
+export type NavigationState = 'HOME' | 'PROJECT' | 'ADMIN_DASHBOARD' | 'IT_HELPDESK';

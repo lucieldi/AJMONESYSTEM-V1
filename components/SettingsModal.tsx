@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, UserPlus, Trash2, Shield, User as UserIcon, Check, Edit2, RotateCcw, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check } from 'lucide-react';
 import { User, UserRole, AppSettings } from '../types';
 
 interface Props {
@@ -10,15 +11,23 @@ interface Props {
   onUpdateUser: (user: User & { password?: string }) => void;
   onDeleteUser: (userId: string) => void;
   currentUserId: string;
+  currentUser: User;
   appSettings: AppSettings;
   setAppSettings: (settings: AppSettings) => void;
 }
 
 type Tab = 'users' | 'security' | 'appearance';
 
-const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onUpdateUser, onDeleteUser, currentUserId, appSettings, setAppSettings }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('users');
+const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onUpdateUser, onDeleteUser, currentUserId, currentUser, appSettings, setAppSettings }) => {
+  const [activeTab, setActiveTab] = useState<Tab>(currentUser.role === 'admin' ? 'users' : 'appearance');
   
+  // Update active tab if user role is not admin and they are on a restricted tab
+  useEffect(() => {
+    if (isOpen && currentUser.role !== 'admin' && activeTab === 'users') {
+        setActiveTab('appearance');
+    }
+  }, [isOpen, currentUser.role, activeTab]);
+
   // User Management State
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -32,6 +41,17 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
   // Security State
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  // Handle Recovery Email Default State
+  useEffect(() => {
+      if (activeTab === 'security') {
+          if (currentUser.role === 'admin') {
+              setRecoveryEmail('');
+          } else {
+              setRecoveryEmail(currentUser.email || '');
+          }
+      }
+  }, [activeTab, currentUser]);
 
   if (!isOpen) return null;
 
@@ -93,7 +113,10 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
           setRecoveryStatus('sent');
           setTimeout(() => {
               setRecoveryStatus('idle');
-              setRecoveryEmail('');
+              // Only clear if admin, otherwise keep user email
+              if (currentUser.role === 'admin') {
+                  setRecoveryEmail('');
+              }
           }, 3000);
       }, 1500);
   };
@@ -106,17 +129,19 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
         <div className="w-64 bg-[#202020] border-r border-[#333] flex flex-col">
             <div className="p-6 border-b border-[#333]">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Shield size={20} className="text-blue-500" /> Admin
+                    <Shield size={20} className="text-blue-500" /> {currentUser.role === 'admin' ? 'Admin' : 'Configurações'}
                 </h2>
                 <p className="text-xs text-notion-muted">Painel de Controle</p>
             </div>
             <div className="p-2 space-y-1">
-                <button 
-                    onClick={() => setActiveTab('users')}
-                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-md transition-colors ${activeTab === 'users' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-[#333]'}`}
-                >
-                    <Users size={18} /> Gerenciamento de Usuários
-                </button>
+                {currentUser.role === 'admin' && (
+                    <button 
+                        onClick={() => setActiveTab('users')}
+                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-md transition-colors ${activeTab === 'users' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-[#333]'}`}
+                    >
+                        <Users size={18} /> Gerenciamento de Usuários
+                    </button>
+                )}
                 <button 
                     onClick={() => setActiveTab('security')}
                     className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-md transition-colors ${activeTab === 'security' ? 'bg-green-600/20 text-green-400' : 'text-gray-400 hover:text-white hover:bg-[#333]'}`}
@@ -141,7 +166,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
         <div className="flex-1 overflow-y-auto bg-[#151515] p-8">
             
             {/* --- TAB: USER MANAGEMENT --- */}
-            {activeTab === 'users' && (
+            {activeTab === 'users' && currentUser.role === 'admin' && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                     <h2 className="text-xl font-bold text-white mb-6">Gerenciamento de Usuários</h2>
                     
@@ -239,21 +264,38 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             <h3 className="font-semibold text-white">Recuperação de Senha</h3>
                         </div>
                         <p className="text-sm text-gray-400 mb-6">
-                            Envie um link de redefinição de senha para o email registrado de um usuário. Isso permitirá que eles definam uma nova senha com segurança.
+                            {currentUser.role === 'admin' 
+                                ? 'Envie um link de redefinição de senha para o email registrado de qualquer usuário.'
+                                : 'Envie um link de redefinição de senha para o seu email registrado.'}
                         </p>
                         
                         <div className="space-y-4">
-                            <label className="text-xs text-notion-muted">Selecione o Usuário para Recuperar</label>
-                            <select 
-                                value={recoveryEmail} 
-                                onChange={e => setRecoveryEmail(e.target.value)} 
-                                className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2.5 text-sm text-white outline-none"
-                            >
-                                <option value="">Selecione um usuário...</option>
-                                {users.filter(u => u.email).map(u => (
-                                    <option key={u.id} value={u.email}>{u.name} ({u.email})</option>
-                                ))}
-                            </select>
+                            <label className="text-xs text-notion-muted">
+                                {currentUser.role === 'admin' ? 'Selecione o Usuário para Recuperar' : 'Seu Email Registrado'}
+                            </label>
+                            
+                            {currentUser.role === 'admin' ? (
+                                <select 
+                                    value={recoveryEmail} 
+                                    onChange={e => setRecoveryEmail(e.target.value)} 
+                                    className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2.5 text-sm text-white outline-none"
+                                >
+                                    <option value="">Selecione um usuário...</option>
+                                    {users.filter(u => u.email).map(u => (
+                                        <option key={u.id} value={u.email}>{u.name} ({u.email})</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="relative opacity-75">
+                                    <input 
+                                        type="text" 
+                                        value={recoveryEmail || 'Email não cadastrado'} 
+                                        disabled 
+                                        className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2.5 text-sm text-gray-400 cursor-not-allowed outline-none"
+                                    />
+                                    <Lock size={16} className="absolute right-3 top-2.5 text-gray-600"/>
+                                </div>
+                            )}
                             
                             <button 
                                 onClick={handleSendRecovery}
@@ -261,7 +303,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                                 className={`w-full flex items-center justify-center gap-2 py-2.5 rounded text-sm font-medium transition-colors ${
                                     recoveryStatus === 'sent' 
                                     ? 'bg-green-600 text-white' 
-                                    : 'bg-[#333] hover:bg-[#444] text-white'
+                                    : 'bg-[#333] hover:bg-[#444] text-white disabled:opacity-50 disabled:cursor-not-allowed'
                                 }`}
                             >
                                 {recoveryStatus === 'idle' && <><Send size={16}/> Enviar Email de Recuperação</>}
@@ -329,7 +371,6 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                     </div>
                  </div>
             )}
-
         </div>
       </div>
     </div>

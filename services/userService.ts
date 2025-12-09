@@ -1,3 +1,4 @@
+
 import { User } from '../types';
 
 const API_URL = 'http://localhost:3001/api';
@@ -41,7 +42,7 @@ export const userService = {
             isBackendAvailable = true;
             return data;
         } catch (error) {
-            console.warn("Backend offline, using LocalStorage for users.");
+            console.info("Backend offline, utilizando LocalStorage para os usuários.");
             isBackendAvailable = false;
             return getLocalUsers();
         }

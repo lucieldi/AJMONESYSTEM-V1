@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { ScrumData, Sprint, Task } from '../types';
-import { Plus, CheckCircle, ChevronDown, ChevronRight, Layers, Trash2, Trophy, PlayCircle } from 'lucide-react';
+import { Plus, CheckCircle, ChevronDown, ChevronRight, Layers, Trash2, Trophy, PlayCircle, RotateCcw } from 'lucide-react';
 
 interface Props {
   data: ScrumData;
@@ -98,12 +99,23 @@ const ScrumBoard: React.FC<Props> = ({ data, onChange }) => {
   };
 
   const completeSprint = (sprintId: string) => {
-      if(!confirm("Concluir este sprint? Todas as tarefas serão arquivadas.")) return;
+      if(!confirm("Concluir este sprint? Todas as tarefas serão arquivadas visualmente como concluídas.")) return;
       const newData = { ...data };
       const sprint = newData.sprints.find(s => s.id === sprintId);
       if (sprint) {
           sprint.status = 'completed';
           sprint.endDate = new Date().toISOString();
+      }
+      onChange(newData);
+  };
+
+  const reopenSprint = (sprintId: string) => {
+      if(!confirm("Reabrir este sprint e torná-lo ativo novamente?")) return;
+      const newData = { ...data };
+      const sprint = newData.sprints.find(s => s.id === sprintId);
+      if (sprint) {
+          sprint.status = 'active';
+          delete sprint.endDate;
       }
       onChange(newData);
   };
@@ -311,6 +323,15 @@ const ScrumBoard: React.FC<Props> = ({ data, onChange }) => {
                                         className="text-xs flex items-center gap-1 bg-green-600/20 text-green-400 hover:bg-green-600/30 px-2 py-1 rounded border border-green-500/30"
                                     >
                                         <CheckCircle size={12}/> Concluir
+                                    </button>
+                                )}
+                                {sprint.status === 'completed' && (
+                                     <button 
+                                        onClick={() => reopenSprint(sprint.id)}
+                                        className="text-xs flex items-center gap-1 bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 px-2 py-1 rounded border border-orange-500/30"
+                                        title="Reabrir Sprint e tornar ativo"
+                                    >
+                                        <RotateCcw size={12}/> Reabrir
                                     </button>
                                 )}
                             </div>

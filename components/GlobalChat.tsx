@@ -6,7 +6,7 @@ import { ChatMessage, User } from '../types';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onNewMessage?: () => void;
+  onNewMessage?: (message: ChatMessage) => void;
   currentUser: User;
   users: User[]; // List of registered users to resolve avatars
 }
@@ -32,25 +32,34 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
     const loadMessages = () => {
         const saved = localStorage.getItem('ajm_global_chat_history');
         if (saved) {
-            setMessages(JSON.parse(saved));
-        } else {
-            setMessages([]);
+            return JSON.parse(saved);
         }
+        return [];
     };
 
-    loadMessages();
+    // Initial load
+    setMessages(loadMessages());
 
     // Listen for changes from other tabs/windows
     const handleStorageChange = (e: StorageEvent) => {
         if (e.key === 'ajm_global_chat_history') {
-            loadMessages();
-            if (onNewMessage) onNewMessage();
+            const newHistory = e.newValue ? JSON.parse(e.newValue) : [];
+            setMessages(newHistory);
+            
+            // Check for new message to notify parent
+            if (newHistory.length > 0) {
+                const latestMsg = newHistory[newHistory.length - 1] as ChatMessage;
+                // Only notify if I didn't send it myself
+                if (latestMsg.senderId !== currentUser.username) {
+                    if (onNewMessage) onNewMessage(latestMsg);
+                }
+            }
         }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [onNewMessage]);
+  }, [currentUser.username, onNewMessage]);
 
   // --- 2. PRESENCE SYSTEM (Heartbeat) ---
   useEffect(() => {

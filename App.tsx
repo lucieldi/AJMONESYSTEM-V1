@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Menu, Search, Home, Plus, Settings, MoreHorizontal, 
   FileText, Trello, GitMerge, ChevronRight, Clock, Trash2, Brain, 
   Image as ImageIcon, Palette, Upload, Type, Archive, RotateCcw, ChevronDown, Smile, X, MoveVertical,
-  ListTodo, MessageSquare, LogOut, User as UserIcon, LayoutDashboard
+  ListTodo, MessageSquare, LogOut, User as UserIcon, LayoutDashboard,
+  LifeBuoy, Monitor
 } from 'lucide-react';
-import { Project, NavigationState, ViewType, KanbanColumn, IshikawaData, ScrumData, User, AppSettings } from './types';
+import { Project, NavigationState, ViewType, KanbanColumn, IshikawaData, ScrumData, User, AppSettings, SupportTicket, ChatMessage } from './types';
 import KanbanBoard from './components/KanbanBoard';
 import IshikawaDiagram from './components/IshikawaDiagram';
 import ScrumBoard from './components/ScrumBoard';
@@ -13,10 +15,12 @@ import GlobalChat from './components/GlobalChat';
 import LoginScreen from './components/LoginScreen';
 import SettingsModal from './components/SettingsModal';
 import AdminDashboard from './components/AdminDashboard';
+import SupportHelpdesk from './components/SupportHelpdesk';
 import { generateKanbanBoard, generateIshikawaData, generateScrumBacklog } from './services/geminiService';
 import { userService } from './services/userService';
+import { projectService } from './services/projectService';
 
-// --- Constants & Mock Data ---
+// --- Constants ---
 
 const COVERS = [
     'linear-gradient(to right, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
@@ -39,68 +43,6 @@ const EMOJI_LIST = [
     '🚀', '📄', '✅', '🎨', '📅', '💡', '🔥', '✨', '🏆', '🎯', 
     '📢', '💰', '📈', '🛒', '🔧', '⚙️', '🏠', '✈️', '🍔', '🎵',
     '💻', '🔒', '📦', '🎁', '🎓', '💊', '⚽', '⭐', '❤️', '⚠️'
-];
-
-const INITIAL_PROJECTS: Project[] = [
-  {
-    id: '1',
-    title: 'Lançamento Marketing Q4',
-    icon: '🚀',
-    updatedAt: new Date(),
-    status: 'active',
-    content: '# Plano de Lançamento de Marketing\n\nEste é o documento principal para o lançamento do Q4.\n\n- [ ] Definir público\n- [ ] Rascunhar cópia',
-    cover: 'linear-gradient(to right, #fa709a 0%, #fee140 100%)',
-    coverPositionY: 50,
-    kanbanData: [
-      { 
-        id: 'c1', 
-        title: 'A Fazer', 
-        color: '#EF4444',
-        tasks: [
-            { 
-                id: 't1', 
-                content: 'Rascunhar Emails', 
-                description: 'Rascunhar a sequência de 3 partes de email para o próximo lançamento de produto. Focar em benefícios e preços antecipados.', 
-                assignee: 'Sarah',
-                dueDate: '2023-11-20',
-                icon: '📧'
-            }, 
-            { id: 't2', content: 'Atualizar Redes Sociais', icon: '📱' }
-        ] 
-      },
-      { id: 'c2', title: 'Em Progresso', color: '#3B82F6', tasks: [{ id: 't3', content: 'Design de Ativos', assignee: 'Mike', icon: '🎨' }] },
-      { id: 'c3', title: 'Concluído', color: '#10B981', tasks: [] }
-    ],
-    ishikawaData: {
-      effect: "Baixa Taxa de Conversão",
-      categories: [
-          { name: "Conteúdo", causes: ["Manchetes chatas", "CTA pouco clara"] },
-          { name: "Tráfego", causes: ["Público errado", "Baixo volume"] }
-      ]
-    },
-    scrumData: {
-        backlog: [
-            { id: 'b1', content: 'Como usuário, quero fazer login via Google', priority: 'High', storyPoints: 5 },
-            { id: 'b2', content: 'Como admin, quero ver análises', priority: 'Medium', storyPoints: 8 },
-        ],
-        sprints: [
-            { id: 's1', title: 'Sprint 1', status: 'active', startDate: new Date().toISOString(), tasks: [
-                { id: 'st1', content: 'Configurar Pipeline CI/CD', priority: 'High', storyPoints: 3 }
-            ]}
-        ]
-    }
-  },
-  {
-    id: '2',
-    title: 'Design do Site Antigo',
-    icon: '🕸️',
-    updatedAt: new Date(Date.now() - 100000000),
-    status: 'completed',
-    content: '# Design Legado\n\nArquivo das especificações do design antigo.',
-    kanbanData: [],
-    ishikawaData: { effect: "Legado", categories: [] },
-    scrumData: { backlog: [], sprints: [] }
-  }
 ];
 
 // --- Helpers ---
@@ -241,8 +183,10 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose }) => {
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Users State (managed via userService)
+  // Data State
   const [users, setUsers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); // New State for tickets
 
   // App Visibility Settings
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -256,7 +200,6 @@ function App() {
 
   const [navState, setNavState] = useState<NavigationState>('HOME');
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [viewType, setViewType] = useState<ViewType>(ViewType.DOCUMENT);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isCompletedOpen, setIsCompletedOpen] = useState(false); // Sidebar toggle
@@ -285,17 +228,35 @@ function App() {
   
   const isAdmin = currentUser?.role === 'admin';
 
-  // Init Users from Service
+  // --- Init Data from Backend ---
   useEffect(() => {
+    // Load Users
     userService.getAllUsers().then(fetchedUsers => {
         setUsers(fetchedUsers);
     });
+
+    // Load Projects
+    projectService.getProjects().then(fetchedProjects => {
+        setProjects(fetchedProjects);
+    });
+
+    // Load Tickets (Simulated for this demo, would be from backend in real app)
+    // For now we start empty or load from local storage
+    const savedTickets = localStorage.getItem('ajm_support_tickets');
+    if (savedTickets) {
+        setSupportTickets(JSON.parse(savedTickets));
+    }
   }, []);
 
   // Persist settings
   useEffect(() => {
     localStorage.setItem('ajm_app_settings', JSON.stringify(appSettings));
   }, [appSettings]);
+
+  // Persist tickets (Simulated persistence)
+  useEffect(() => {
+      localStorage.setItem('ajm_support_tickets', JSON.stringify(supportTickets));
+  }, [supportTickets]);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -324,31 +285,35 @@ function App() {
       setIsSettingsOpen(false);
   };
 
+  // --- User Handlers ---
   const handleAddUser = async (newUser: User & { password?: string }) => {
-      // Use Service
       const created = await userService.createUser(newUser);
       setUsers(prev => [...prev, created]);
   };
 
   const handleUpdateUser = async (updatedUser: User & { password?: string }) => {
-      // Use Service
       const updated = await userService.updateUser(updatedUser);
       setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
       
-      // Update current user if it's me
       if (currentUser && currentUser.id === updated.id) {
           setCurrentUser({ ...currentUser, ...updated });
       }
   };
 
   const handleDeleteUser = async (userId: string) => {
-      // Use Service
       await userService.deleteUser(userId);
       setUsers(prev => prev.filter(u => u.id !== userId));
   };
 
+  // --- Project Handlers (With Persistence) ---
+
+  const saveProjectsChanges = (newProjects: Project[]) => {
+      setProjects(newProjects);
+      projectService.saveProjects(newProjects); // Save to Backend/Local
+  };
+
   const handleCreateProject = () => {
-    if (!isAdmin) return; // Guard
+    if (!isAdmin) return;
     const newProject: Project = {
       id: crypto.randomUUID(),
       title: 'Sem Título',
@@ -364,25 +329,85 @@ function App() {
       ishikawaData: { effect: "Problema", categories: [] },
       scrumData: { backlog: [], sprints: [] }
     };
-    setProjects([newProject, ...projects]);
+    
+    const newProjects = [newProject, ...projects];
+    saveProjectsChanges(newProjects);
+    
     setCurrentProjectId(newProject.id);
     setNavState('PROJECT');
     setViewType(ViewType.DOCUMENT);
   };
 
+  const handleCreateTemplateProject = (type: 'kanban' | 'ishikawa') => {
+    if (!isAdmin) {
+        setToast({ message: 'Apenas administradores podem criar projetos.' });
+        setTimeout(() => setToast(null), 3000);
+        return;
+    }
+
+    const newProject: Project = {
+      id: crypto.randomUUID(),
+      title: type === 'kanban' ? 'Tutorial Kanban' : 'Tutorial Ishikawa',
+      icon: type === 'kanban' ? '📋' : '🐟',
+      updatedAt: new Date(),
+      status: 'active',
+      content: type === 'kanban' 
+        ? '# Tutorial Kanban\n\nEste projeto foi criado automaticamente para demonstrar o uso do quadro Kanban.\n\nUse este quadro para gerenciar tarefas, arrastar itens entre colunas e acompanhar o progresso.'
+        : '# Tutorial Ishikawa\n\nEste projeto foi criado automaticamente para demonstrar o Diagrama de Ishikawa.\n\nUse este diagrama para analisar causas raízes de problemas.',
+      kanbanData: [
+        { 
+            id: 'todo', title: 'A Fazer', color: '#EF4444', 
+            tasks: [
+                { id: crypto.randomUUID(), content: 'Bem-vindo ao Kanban!', priority: 'Low', icon: '👋' },
+                { id: crypto.randomUUID(), content: 'Arraste este cartão para a direita', priority: 'Medium', icon: '➡️' }
+            ] 
+        },
+        { 
+            id: 'prog', title: 'Em Progresso', color: '#3B82F6', 
+            tasks: [
+                { id: crypto.randomUUID(), content: 'Estudando o sistema', priority: 'High', icon: '📖' }
+            ] 
+        },
+        { 
+            id: 'done', title: 'Concluído', color: '#10B981', 
+            tasks: [
+                { id: crypto.randomUUID(), content: 'Projeto Criado', priority: 'Low', icon: '✅' }
+            ] 
+        }
+      ],
+      ishikawaData: { 
+          effect: "Atraso no Projeto", 
+          categories: [
+              { name: "Método", causes: ["Processo não definido", "Falta de padrão"] },
+              { name: "Material", causes: ["Ferramentas lentas"] },
+              { name: "Mão de obra", causes: ["Falta de treinamento", "Equipe reduzida"] },
+              { name: "Meio Ambiente", causes: ["Barulho excessivo"] }
+          ] 
+      },
+      scrumData: { backlog: [], sprints: [] }
+    };
+    
+    const newProjects = [newProject, ...projects];
+    saveProjectsChanges(newProjects);
+    
+    setCurrentProjectId(newProject.id);
+    setNavState('PROJECT');
+    setViewType(type === 'kanban' ? ViewType.KANBAN : ViewType.ISHIKAWA);
+  };
+
   const updateProject = (id: string, updates: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p));
+    const newProjects = projects.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p);
+    saveProjectsChanges(newProjects);
   };
 
   const toggleProjectStatus = (id: string) => {
-      if (!isAdmin) return; // Guard
+      if (!isAdmin) return; 
       const project = projects.find(p => p.id === id);
       if (!project) return;
       
       const newStatus = project.status === 'active' ? 'completed' : 'active';
       updateProject(id, { status: newStatus });
 
-      // Show Undo Toast
       if (newStatus === 'completed') {
           setToast({
               message: 'Projeto movido para o arquivo',
@@ -421,6 +446,55 @@ function App() {
           setPendingUpload(null);
       }
   };
+
+  // --- Ticket Handlers ---
+  const handleAddTicket = (ticket: SupportTicket) => {
+      setSupportTickets(prev => [ticket, ...prev]);
+      setToast({ message: 'Chamado criado com sucesso!' });
+      setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleUpdateTicketStatus = (ticketId: string, status: SupportTicket['status']) => {
+      setSupportTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status } : t));
+  };
+
+  // --- Chat Notifications ---
+  const handleChatNotification = (msg: ChatMessage) => {
+      if (!currentUser) return;
+
+      // Only increment unread if chat is closed
+      if (!isChatOpen) {
+          setUnreadMessages(prev => prev + 1);
+      }
+      
+      const isPrivate = msg.recipientId === currentUser.username;
+      
+      // Notify if: 
+      // 1. It is a private message for me (High Priority)
+      // 2. OR It is a global message AND chat is closed
+      
+      if (isPrivate || !isChatOpen) {
+          const sender = users.find(u => u.username === msg.senderId)?.name || msg.senderId;
+          const prefix = isPrivate ? 'Mensagem Privada' : 'Chat da Equipe';
+          
+          setToast({
+              message: `🔔 ${prefix} de ${sender}: "${msg.text.substring(0, 20)}${msg.text.length > 20 ? '...' : ''}"`
+          });
+          
+          // Play notification sound (Simple beep using standard browser API if allowed)
+          try {
+              // Using a reliable CDN for a simple UI beep
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); 
+              audio.volume = 0.5;
+              audio.play().catch(e => console.log('Audio autoplay blocked', e));
+          } catch (e) {
+              console.warn("Audio playback failed");
+          }
+      }
+  };
+
+
+  // --- AI Handlers ---
 
   const handleGenerateKanban = async () => {
     if (!currentProject) return;
@@ -466,10 +540,12 @@ function App() {
   // --- Render Helpers ---
 
   const renderSidebar = () => (
-    <div className={`h-screen bg-notion-sidebar border-r border-[#333] flex flex-col transition-all duration-300 ${appSettings.showSidebar && isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}>
+    <div className={`fixed inset-y-0 left-0 z-40 bg-notion-sidebar border-r border-[#333] flex flex-col transition-transform duration-300 md:relative md:translate-x-0 ${
+        appSettings.showSidebar && isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:w-0 md:overflow-hidden'
+    }`}>
       <div className="p-4 flex items-center justify-between group">
         <div className="flex items-center gap-2 font-medium truncate">
-          <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center text-xs">A</div>
+          <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center text-xs text-white">A</div>
           <span>AJM OneSystem</span>
         </div>
       </div>
@@ -479,7 +555,7 @@ function App() {
           <Search size={16} /> Pesquisar
         </button>
         <button 
-          onClick={() => setNavState('HOME')}
+          onClick={() => { setNavState('HOME'); setIsSidebarOpen(false); }}
           className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'HOME' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
         >
           <Home size={16} /> Início
@@ -488,25 +564,24 @@ function App() {
         {/* Admin Dashboard Link */}
         {isAdmin && (
             <button 
-                onClick={() => setNavState('ADMIN_DASHBOARD')}
+                onClick={() => { setNavState('ADMIN_DASHBOARD'); setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'ADMIN_DASHBOARD' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
             >
                 <LayoutDashboard size={16} /> Painel
             </button>
         )}
 
-        {isAdmin && (
-            <button 
-                onClick={() => setIsSettingsOpen(true)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-notion-muted hover:bg-notion-hover hover:text-notion-text rounded-md text-sm"
-            >
-                <Settings size={16} /> Configurações
-            </button>
-        )}
+        {/* Settings Toggle in Sidebar */}
+        <button 
+            onClick={() => { setIsSettingsOpen(true); setIsSidebarOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-notion-muted hover:bg-notion-hover hover:text-notion-text rounded-md text-sm"
+        >
+            <Settings size={16} /> Configurações
+        </button>
         
         {/* Chat Toggle in Sidebar */}
         <button 
-            onClick={() => { setIsChatOpen(true); setUnreadMessages(0); }}
+            onClick={() => { setIsChatOpen(true); setUnreadMessages(0); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm relative ${isChatOpen ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
         >
           <MessageSquare size={16} /> Chat da Equipe
@@ -521,21 +596,27 @@ function App() {
       <div className="mt-6 px-4 flex-1 overflow-y-auto">
         {/* ACTIVE PROJECTS */}
         <div className="text-xs font-semibold text-notion-muted mb-2 flex justify-between items-center">
-            <span>PRIVADO</span>
+            <span>LISTAS</span>
             {isAdmin && <Plus size={14} className="cursor-pointer hover:text-white" onClick={handleCreateProject}/>}
         </div>
         <div className="space-y-0.5 mb-6">
           {activeProjects.map(p => (
             <div 
               key={p.id}
-              onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); }}
+              onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); setIsSidebarOpen(false); }}
               className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer ${currentProjectId === p.id && navState === 'PROJECT' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
             >
               <span className="text-base">{p.icon}</span>
               <span className="truncate flex-1">{p.title}</span>
               {isAdmin && (
                 <div 
-                    onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) setProjects(projects.filter(pr => pr.id !== p.id)); }}
+                    onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if(confirm('Excluir projeto permanentemente?')) {
+                            const newProjs = projects.filter(pr => pr.id !== p.id);
+                            saveProjectsChanges(newProjs);
+                        } 
+                    }}
                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#444] rounded"
                 >
                     <Trash2 size={12}/>
@@ -547,7 +628,7 @@ function App() {
 
         {/* COMPLETED PROJECTS */}
         {completedProjects.length > 0 && (
-            <div>
+            <div className="mb-6">
                  <div 
                     className="text-xs font-semibold text-notion-muted mb-2 flex items-center gap-1 cursor-pointer hover:text-gray-400"
                     onClick={() => setIsCompletedOpen(!isCompletedOpen)}
@@ -560,7 +641,7 @@ function App() {
                         {completedProjects.map(p => (
                             <div 
                             key={p.id}
-                            onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); }}
+                            onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); setIsSidebarOpen(false); }}
                             className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer opacity-70 hover:opacity-100 ${currentProjectId === p.id && navState === 'PROJECT' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
                             >
                             <span className="text-base grayscale">{p.icon}</span>
@@ -580,6 +661,16 @@ function App() {
                  )}
             </div>
         )}
+      </div>
+
+      {/* Helpdesk Link - Pinned to bottom before profile */}
+      <div className="px-2 py-2 border-t border-[#333]/50">
+        <button 
+            onClick={() => { setNavState('IT_HELPDESK'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'IT_HELPDESK' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
+        >
+          <Monitor size={16} className={navState === 'IT_HELPDESK' ? "text-purple-400" : ""} /> Suporte / Helpdesk
+        </button>
       </div>
 
       {/* User Profile / Logout */}
@@ -684,17 +775,21 @@ function App() {
       <div className="mb-8">
          <h2 className="text-sm font-semibold text-notion-muted uppercase mb-4">Aprenda</h2>
          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <div className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20">
-                 <div className="h-24 bg-gradient-to-r from-blue-900 to-slate-900"></div>
+             <div onClick={() => handleCreateTemplateProject('kanban')} className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20 transition-transform hover:scale-[1.02]">
+                 <div className="h-24 bg-gradient-to-r from-blue-900 to-slate-900 flex items-center justify-center">
+                     <Trello size={32} className="text-white/50"/>
+                 </div>
                  <div className="p-3">
-                     <h3 className="font-medium text-sm mb-1">Começando com Kanbans</h3>
+                     <h3 className="font-medium text-sm mb-1 text-white">Começando com Kanbans</h3>
                      <p className="text-xs text-notion-muted">Organize suas tarefas de forma eficaz.</p>
                  </div>
              </div>
-             <div className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20">
-                 <div className="h-24 bg-gradient-to-r from-green-900 to-teal-900"></div>
+             <div onClick={() => handleCreateTemplateProject('ishikawa')} className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20 transition-transform hover:scale-[1.02]">
+                 <div className="h-24 bg-gradient-to-r from-green-900 to-teal-900 flex items-center justify-center">
+                     <GitMerge size={32} className="text-white/50 rotate-90"/>
+                 </div>
                  <div className="p-3">
-                     <h3 className="font-medium text-sm mb-1">Básico de Ishikawa</h3>
+                     <h3 className="font-medium text-sm mb-1 text-white">Básico de Ishikawa</h3>
                      <p className="text-xs text-notion-muted">Encontre a causa raiz de qualquer problema.</p>
                  </div>
              </div>
@@ -714,7 +809,7 @@ function App() {
       >
         {/* Project Header (Top Bar) */}
         {appSettings.showBreadcrumbs && (
-            <div className="h-12 flex items-center justify-between px-4 sticky top-0 z-20 bg-inherit/90 backdrop-blur-sm">
+            <div className={`h-12 flex items-center justify-between px-4 sticky top-0 z-20 bg-inherit/90 backdrop-blur-sm ${!isSidebarOpen && appSettings.showSidebar ? 'pl-14' : ''}`}>
             <div className="flex items-center gap-2">
                 <span className="text-notion-muted text-sm cursor-pointer hover:underline" onClick={() => setNavState('HOME')}>Início</span>
                 <span className="text-notion-muted">/</span>
@@ -911,28 +1006,28 @@ function App() {
                  />
             </div>
 
-            <div className="flex items-center gap-4 border-b border-white/10 mb-6 shrink-0">
+            <div className="flex items-center gap-4 border-b border-white/10 mb-6 shrink-0 overflow-x-auto no-scrollbar">
                 <button 
                     onClick={() => setViewType(ViewType.DOCUMENT)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors ${viewType === ViewType.DOCUMENT ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.DOCUMENT ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
                 >
                     <FileText size={16}/> Documento
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.KANBAN)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors ${viewType === ViewType.KANBAN ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.KANBAN ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
                 >
                     <Trello size={16}/> Kanban
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.ISHIKAWA)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors ${viewType === ViewType.ISHIKAWA ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.ISHIKAWA ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
                 >
                     <GitMerge size={16} className="rotate-90"/> Ishikawa
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.SCRUM)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors ${viewType === ViewType.SCRUM ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.SCRUM ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
                 >
                     <ListTodo size={16}/> Scrum
                 </button>
@@ -951,12 +1046,12 @@ function App() {
 
                 {viewType === ViewType.KANBAN && (
                     <div className="h-full flex flex-col">
-                        <div className="flex justify-between items-center mb-4 shrink-0">
-                            <p className="text-sm text-notion-muted">Arraste os cartões para atualizar o status. Clique para editar.</p>
+                        <div className="flex justify-between items-center mb-4 shrink-0 gap-2">
+                            <p className="text-sm text-notion-muted truncate">Arraste os cartões para atualizar o status.</p>
                             <button 
                                 onClick={handleGenerateKanban}
                                 disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-purple-600/20 text-purple-300 px-3 py-1.5 rounded text-xs hover:bg-purple-600/30 transition-colors border border-purple-500/30"
+                                className="flex items-center gap-2 bg-purple-600/20 text-purple-300 px-3 py-1.5 rounded text-xs hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap"
                             >
                                 <Brain size={14} />
                                 {isAiLoading ? 'Gerando...' : 'Gerar Colunas Automaticamente'}
@@ -966,6 +1061,7 @@ function App() {
                              <KanbanBoard 
                                 data={currentProject.kanbanData} 
                                 onChange={(newData) => updateProject(currentProject.id, { kanbanData: newData })}
+                                currentUser={currentUser}
                             />
                         </div>
                     </div>
@@ -974,13 +1070,13 @@ function App() {
                 {viewType === ViewType.ISHIKAWA && (
                     <div className="h-full flex flex-col">
                          <div className="flex justify-between items-center mb-4 shrink-0">
-                             <div className="text-sm text-notion-muted">
+                             <div className="text-sm text-notion-muted truncate max-w-[200px] md:max-w-none">
                                  Efeito: <span className="text-white font-semibold">{currentProject.ishikawaData.effect}</span>
                              </div>
                              <button 
                                 onClick={handleGenerateIshikawa}
                                 disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-blue-600/20 text-blue-300 px-3 py-1.5 rounded text-xs hover:bg-blue-600/30 transition-colors border border-blue-500/30"
+                                className="flex items-center gap-2 bg-blue-600/20 text-blue-300 px-3 py-1.5 rounded text-xs hover:bg-blue-600/30 transition-colors border border-blue-500/30 whitespace-nowrap"
                             >
                                 <Brain size={14} />
                                 {isAiLoading ? 'Analisando...' : 'Gerar com IA'}
@@ -994,12 +1090,12 @@ function App() {
                 
                 {viewType === ViewType.SCRUM && (
                      <div className="h-full flex flex-col">
-                        <div className="flex justify-between items-center mb-4 shrink-0">
-                            <p className="text-sm text-notion-muted">Planeje sprints movendo itens do backlog para sprints ativos.</p>
+                        <div className="flex justify-between items-center mb-4 shrink-0 gap-2">
+                            <p className="text-sm text-notion-muted truncate">Planeje sprints movendo itens do backlog.</p>
                             <button 
                                 onClick={handleGenerateBacklog}
                                 disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-green-600/20 text-green-300 px-3 py-1.5 rounded text-xs hover:bg-green-600/30 transition-colors border border-green-500/30"
+                                className="flex items-center gap-2 bg-green-600/20 text-green-300 px-3 py-1.5 rounded text-xs hover:bg-green-600/30 transition-colors border border-green-500/30 whitespace-nowrap"
                             >
                                 <Brain size={14} />
                                 {isAiLoading ? 'Gerando...' : 'Gerar Histórias de Usuário'}
@@ -1020,11 +1116,31 @@ function App() {
   };
 
   if (!currentUser) {
-      return <LoginScreen onLogin={handleLogin} users={users} />;
+      return (
+        <>
+            {/* Backdrop for Mobile Sidebar */}
+            {appSettings.showSidebar && isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/50 z-30 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+            <LoginScreen onLogin={handleLogin} users={users} />
+        </>
+      );
   }
 
   return (
     <div className="flex h-screen bg-[#191919] text-[#D4D4D4] font-sans selection:bg-[#2383E2] selection:text-white overflow-hidden">
+      
+      {/* Mobile Sidebar Backdrop */}
+      {appSettings.showSidebar && isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+      )}
+
       {/* Mobile Toggle */}
       {!isSidebarOpen && appSettings.showSidebar && (
           <div className="absolute top-4 left-4 z-50">
@@ -1055,6 +1171,16 @@ function App() {
                     onNavigateToProject={(id) => { setCurrentProjectId(id); setNavState('PROJECT'); }}
                  />
              )}
+             {navState === 'IT_HELPDESK' && (
+                 <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto">
+                    <SupportHelpdesk 
+                        currentUser={currentUser}
+                        tickets={supportTickets}
+                        onAddTicket={handleAddTicket}
+                        onUpdateTicketStatus={handleUpdateTicketStatus}
+                    />
+                 </div>
+             )}
           </div>
 
           {/* Toast Notification */}
@@ -1083,7 +1209,7 @@ function App() {
         <GlobalChat 
             isOpen={isChatOpen} 
             onClose={() => setIsChatOpen(false)} 
-            onNewMessage={() => setUnreadMessages(prev => prev + 1)}
+            onNewMessage={handleChatNotification}
             currentUser={currentUser}
             users={users}
         />
@@ -1098,6 +1224,7 @@ function App() {
          onUpdateUser={handleUpdateUser}
          onDeleteUser={handleDeleteUser}
          currentUserId={currentUser.id}
+         currentUser={currentUser}
          appSettings={appSettings}
          setAppSettings={setAppSettings}
       />
