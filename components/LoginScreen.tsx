@@ -216,9 +216,6 @@ const LoginScreen: React.FC<Props> = ({ onLogin, users }) => {
         {view === 'login' ? (
           <>
             <div className="text-center mb-8">
-               <div className="flex justify-center mb-6">
-                   <img src="/ajm.png" alt="Grupo AJM" className="h-20 object-contain" />
-               </div>
                <h1 className="text-2xl font-bold text-white mb-2">Bem-vindo de volta</h1>
                <p className="text-gray-400 text-sm">Insira suas credenciais para acessar o AJM OneSystem</p>
             </div>
