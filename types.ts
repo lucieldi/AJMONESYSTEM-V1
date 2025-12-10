@@ -95,6 +95,7 @@ export interface Project {
   coverText?: string; // Text to display over the cover
   theme?: string; // Background color for the project view
   status: 'active' | 'completed'; // New field for project status
+  createdBy?: string; // ID of the user who created the project
 }
 
 export interface ChatMessage {

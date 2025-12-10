@@ -93,10 +93,19 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
     e.preventDefault();
     if (!name || !username) return;
 
+    // VALIDAÇÃO DE DUPLICIDADE
+    if (!editingUserId) {
+        const userExists = users.some(u => u.username.toLowerCase() === username.trim().toLowerCase());
+        if (userExists) {
+            alert('Este nome de usuário já está em uso. Por favor, escolha outro.');
+            return;
+        }
+    }
+
     const baseUserData = {
-      id: editingUserId || username, 
+      id: editingUserId || username.trim(), 
       name,
-      username,
+      username: username.trim(),
       email,
       role,
       avatar
@@ -207,22 +216,26 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                                 <label className="text-xs text-notion-muted">Endereço de Email</label>
                                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="usuario@empresa.com"/>
                             </div>
-                            <div className="col-span-1 space-y-1">
+                            {/* Password Field - Full width for standard users, half for admins (who have Role next to it) */}
+                            <div className={`${currentUser.role === 'admin' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
                                 <label className="text-xs text-notion-muted">Senha {editingUserId && "(Em branco para manter)"}</label>
                                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="••••••"/>
                             </div>
-                             <div className="col-span-1 space-y-1">
-                                <label className="text-xs text-notion-muted">Função</label>
-                                <select 
-                                    value={role} 
-                                    onChange={e => setRole(e.target.value as UserRole)} 
-                                    disabled={currentUser.role !== 'admin'} // Standard users cannot change their own role
-                                    className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <option value="user">Usuário Padrão</option>
-                                    <option value="admin">Admin</option>
-                                </select>
-                            </div>
+                            
+                            {/* Role Field - ONLY VISIBLE TO ADMINS */}
+                            {currentUser.role === 'admin' && (
+                                <div className="col-span-1 space-y-1">
+                                    <label className="text-xs text-notion-muted">Função</label>
+                                    <select 
+                                        value={role} 
+                                        onChange={e => setRole(e.target.value as UserRole)} 
+                                        className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600"
+                                    >
+                                        <option value="user">Usuário Padrão</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                            )}
                             
                             <div className="col-span-2 flex justify-end gap-2 mt-2">
                                 {editingUserId && currentUser.role === 'admin' && (

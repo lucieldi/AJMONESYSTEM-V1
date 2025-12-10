@@ -2,119 +2,121 @@
 import { User } from '../types';
 
 const API_URL = 'http://localhost:3001/api';
-const STORAGE_KEY = 'ajm_users_db';
+const LS_KEY = 'ajm_users_local_db';
 
-// Fallback Mock Data (if backend is offline/first run)
-const INITIAL_USERS: User[] = [
-    { id: 'admin', username: 'admin', password: '1234', name: 'Usuário Admin', email: 'admin@ajmonesystem.com', role: 'admin', avatar: '🛡️' } as any,
-    { id: 'user', username: 'user', password: '1234', name: 'Usuário Padrão', email: 'user@ajmonesystem.com', role: 'user', avatar: '👤' } as any
+// Dados iniciais caso não exista nada local nem no backend
+const FALLBACK_USERS: User[] = [
+    { id: 'admin', username: 'admin', password: '1234', name: 'Admin Local', email: 'admin@local', role: 'admin', avatar: '🛡️' } as any,
+    { id: 'user', username: 'user', password: '1234', name: 'User Local', email: 'user@local', role: 'user', avatar: '👤' } as any
 ];
 
-// Helper to check if backend is reachable (simple heuristic via fetch failure)
-let isBackendAvailable = false;
-
-// --- Private Helpers for LocalStorage ---
-
+// Helpers para LocalStorage
 const getLocalUsers = (): User[] => {
     try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : INITIAL_USERS;
+        const stored = localStorage.getItem(LS_KEY);
+        return stored ? JSON.parse(stored) : FALLBACK_USERS;
     } catch {
-        return INITIAL_USERS;
+        return FALLBACK_USERS;
     }
 };
 
 const saveLocalUsers = (users: User[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+    try {
+        localStorage.setItem(LS_KEY, JSON.stringify(users));
+    } catch (e) {
+        console.warn("Erro ao salvar cache local de usuários");
+    }
 };
 
-// --- Service Methods ---
-
 export const userService = {
-    /**
-     * Fetch all users from Backend or LocalStorage
-     */
     async getAllUsers(): Promise<User[]> {
         try {
-            const res = await fetch(`${API_URL}/users`, { signal: AbortSignal.timeout(2000) });
-            if (!res.ok) throw new Error('Backend unavailable');
-            const data = await res.json();
-            isBackendAvailable = true;
-            return data;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
+            const res = await fetch(`${API_URL}/users`, { 
+                signal: controller.signal,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            clearTimeout(timeoutId);
+            
+            if (!res.ok) throw new Error('Servidor indisponível');
+            
+            const users = await res.json();
+            // Atualiza o backup local sempre que conseguir dados frescos do backend
+            saveLocalUsers(users);
+            return users;
         } catch (error) {
-            console.info("Backend offline, utilizando LocalStorage para os usuários.");
-            isBackendAvailable = false;
+            // Silenciosamente retorna dados locais sem erro no console
             return getLocalUsers();
         }
     },
 
-    /**
-     * Create a new user
-     */
     async createUser(user: User & { password?: string }): Promise<User> {
-        if (isBackendAvailable) {
-            try {
-                const res = await fetch(`${API_URL}/users`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(user)
-                });
-                if (res.ok) return await res.json();
-            } catch (e) {
-                console.error("Failed to create user on backend", e);
+        // Tenta salvar no backend
+        try {
+            const res = await fetch(`${API_URL}/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(user)
+            });
+            
+            // SE O BACKEND REJEITAR (ex: 400 Duplicado), lança erro para não salvar localmente
+            if (!res.ok) {
+                if (res.status === 400 || res.status === 409) {
+                    throw new Error("Erro de validação: Usuário já existe ou dados inválidos");
+                }
             }
+
+            if (res.ok) return await res.json();
+        } catch (e) { 
+            // Se for erro de validação (lançado acima), repassa o erro para interromper o fluxo
+            if (e instanceof Error && e.message.includes("Erro de validação")) {
+                throw e;
+            }
+            // Se for erro de rede (fetch failed), ignora e vai pro fallback
         }
-        
-        // Fallback
-        const users = getLocalUsers();
-        users.push(user);
-        saveLocalUsers(users);
-        return user;
+
+        // Fallback: Salva localmente (Apenas se não foi rejeitado pelo servidor explicitamente)
+        const currentUsers = getLocalUsers();
+        // Verificação extra local de duplicidade para segurança offline
+        if (currentUsers.some(u => u.username === user.username)) {
+             throw new Error("Erro de validação: Usuário já existe (Local)");
+        }
+
+        currentUsers.push(user as User); 
+        saveLocalUsers(currentUsers);
+        return user as User;
     },
 
-    /**
-     * Update an existing user
-     */
     async updateUser(user: User & { password?: string }): Promise<User> {
-        if (isBackendAvailable) {
-            try {
-                const res = await fetch(`${API_URL}/users/${user.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(user)
-                });
-                if (res.ok) return await res.json();
-            } catch (e) {
-                console.error("Failed to update user on backend", e);
-            }
-        }
+        try {
+            const res = await fetch(`${API_URL}/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(user)
+            });
+            if (res.ok) return await res.json();
+        } catch (e) { /* Ignora */ }
 
-        // Fallback
-        const users = getLocalUsers();
-        const index = users.findIndex(u => u.id === user.id);
+        // Fallback Local
+        const currentUsers = getLocalUsers();
+        const index = currentUsers.findIndex(u => u.id === user.id);
         if (index !== -1) {
-            users[index] = { ...users[index], ...user };
-            saveLocalUsers(users);
+            currentUsers[index] = { ...currentUsers[index], ...user };
+            saveLocalUsers(currentUsers);
         }
-        return user;
+        return user as User;
     },
 
-    /**
-     * Delete a user
-     */
     async deleteUser(userId: string): Promise<void> {
-        if (isBackendAvailable) {
-            try {
-                await fetch(`${API_URL}/users/${userId}`, { method: 'DELETE' });
-                return;
-            } catch (e) {
-                console.error("Failed to delete user on backend", e);
-            }
-        }
+        try {
+            await fetch(`${API_URL}/users/${userId}`, { method: 'DELETE' });
+        } catch (e) { /* Ignora */ }
 
-        // Fallback
-        const users = getLocalUsers();
-        const filtered = users.filter(u => u.id !== userId);
+        // Fallback Local
+        const currentUsers = getLocalUsers();
+        const filtered = currentUsers.filter(u => u.id !== userId);
         saveLocalUsers(filtered);
     }
 };

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Send, Trash2, Users, MessageSquare, ChevronLeft, Search, CheckCheck, Circle } from 'lucide-react';
 import { ChatMessage, User } from '../types';
+import { chatService } from '../services/chatService';
 
 interface Props {
   isOpen: boolean;
@@ -26,39 +27,33 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
   const [statuses, setStatuses] = useState<Record<string, UserStatus>>({});
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastNotifiedMsgId = useRef<string | null>(null);
 
-  // --- 1. MESSAGE SYNC ---
+  // --- 1. MESSAGE SYNC (POLLING) ---
   useEffect(() => {
-    const loadMessages = () => {
-        const saved = localStorage.getItem('ajm_global_chat_history');
-        if (saved) {
-            return JSON.parse(saved);
-        }
-        return [];
-    };
+    // Função de busca
+    const fetchMessages = async () => {
+        const msgs = await chatService.getMessages();
+        setMessages(msgs);
 
-    // Initial load
-    setMessages(loadMessages());
-
-    // Listen for changes from other tabs/windows
-    const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === 'ajm_global_chat_history') {
-            const newHistory = e.newValue ? JSON.parse(e.newValue) : [];
-            setMessages(newHistory);
-            
-            // Check for new message to notify parent
-            if (newHistory.length > 0) {
-                const latestMsg = newHistory[newHistory.length - 1] as ChatMessage;
-                // Only notify if I didn't send it myself
-                if (latestMsg.senderId !== currentUser.username) {
-                    if (onNewMessage) onNewMessage(latestMsg);
-                }
+        // Notificação de nova mensagem
+        if (msgs.length > 0) {
+            const latestMsg = msgs[msgs.length - 1];
+            // Se a mensagem é nova e não fui eu que mandei
+            if (latestMsg.id !== lastNotifiedMsgId.current && latestMsg.senderId !== currentUser.username) {
+                lastNotifiedMsgId.current = latestMsg.id;
+                if (onNewMessage) onNewMessage(latestMsg);
             }
         }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    // Busca inicial
+    fetchMessages();
+
+    // Polling a cada 2 segundos para simular tempo real
+    const interval = setInterval(fetchMessages, 2000);
+
+    return () => clearInterval(interval);
   }, [currentUser.username, onNewMessage]);
 
   // --- 2. PRESENCE SYSTEM (Heartbeat) ---
@@ -121,7 +116,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
       }
   }, [messages, isOpen, currentView]);
 
-  const handleSend = (e?: React.FormEvent) => {
+  const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputText.trim()) return;
 
@@ -135,20 +130,18 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
         timestamp: new Date().toISOString()
     };
 
-    const newHistory = [...messages, newMsg];
-    setMessages(newHistory);
-    localStorage.setItem('ajm_global_chat_history', JSON.stringify(newHistory));
-    
-    // Force storage event for current tab (optional, as React state handles it, but good for consistency)
-    // window.dispatchEvent(new Event('storage')); 
-    
+    // Atualiza UI instantaneamente
+    setMessages(prev => [...prev, newMsg]);
     setInputText('');
+
+    // Envia para o serviço (Backend)
+    await chatService.sendMessage(newMsg);
   };
 
-  const handleClearChat = () => {
+  const handleClearChat = async () => {
       if(confirm('Limpar banco de dados do chat? Isso afeta todos os usuários.')) {
+          await chatService.clearMessages();
           setMessages([]);
-          localStorage.removeItem('ajm_global_chat_history');
       }
   }
 

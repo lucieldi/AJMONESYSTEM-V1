@@ -1,52 +1,42 @@
-
 const API_URL = 'http://localhost:3001/api';
 
 export const fileService = {
     /**
-     * Uploads a file to the backend. 
-     * If backend is offline, falls back to local Base64 conversion (Demo Mode).
+     * Tenta enviar arquivo para o backend. Se falhar, converte para Base64 para uso local.
      */
     async uploadFile(file: File, folder?: string): Promise<{ url: string; name: string; type: 'image' | 'file' }> {
-        const type = file.type.startsWith('image/') ? 'image' : 'file';
-
-        // 1. Try Uploading to Server
+        // Tentativa de Upload Online
         try {
             const formData = new FormData();
             formData.append('file', file);
-
-            const query = folder ? `?folder=${folder}` : '';
+            const query = folder === 'documents' ? '?folder=documents' : '';
             
-            // Add timeout to prevent hanging if backend is down
             const res = await fetch(`${API_URL}/upload${query}`, {
                 method: 'POST',
-                body: formData,
-                signal: AbortSignal.timeout(2000) 
+                body: formData
             });
 
             if (res.ok) {
                 const data = await res.json();
                 return {
-                    url: data.url,
+                    url: data.url, 
                     name: data.originalName,
-                    type: type
+                    type: data.type
                 };
             }
         } catch (error) {
-            console.info("Falha no upload para o servidor (Offline). Usando Base64 local como alternativa.");
+            // Backend offline - segue para fallback
         }
 
-        // 2. Fallback: Convert to Base64 (Data URL)
+        // Fallback: Modo Offline (Base64)
+        // Permite que o usuário veja a imagem/arquivo mesmo sem servidor rodando
         return new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onload = (event) => {
-                if (event.target?.result) {
-                    resolve({
-                        url: event.target.result as string,
-                        name: file.name,
-                        type: type
-                    });
-                }
-            };
+            reader.onload = (e) => resolve({
+                url: e.target?.result as string,
+                name: file.name,
+                type: file.type.startsWith('image/') ? 'image' : 'file'
+            });
             reader.readAsDataURL(file);
         });
     }

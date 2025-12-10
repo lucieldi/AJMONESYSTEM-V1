@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   Menu, Search, Home, Plus, Settings, MoreHorizontal, 
   FileText, Trello, GitMerge, ChevronRight, Clock, Trash2, Brain, 
   Image as ImageIcon, Palette, Upload, Type, Archive, RotateCcw, ChevronDown, Smile, X, MoveVertical,
   ListTodo, MessageSquare, LogOut, User as UserIcon, LayoutDashboard,
-  LifeBuoy, Monitor
+  LifeBuoy, Monitor, Briefcase, TrendingUp, ShieldCheck
 } from 'lucide-react';
 import { Project, NavigationState, ViewType, KanbanColumn, IshikawaData, ScrumData, User, AppSettings, SupportTicket, ChatMessage } from './types';
 import KanbanBoard from './components/KanbanBoard';
@@ -186,7 +186,7 @@ function App() {
   // Data State
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); // New State for tickets
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); 
 
   // App Visibility Settings
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -221,12 +221,19 @@ function App() {
   const styleMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Computed
-  const currentProject = projects.find(p => p.id === currentProjectId);
-  const activeProjects = projects.filter(p => p.status === 'active');
-  const completedProjects = projects.filter(p => p.status === 'completed');
-  
   const isAdmin = currentUser?.role === 'admin';
+
+  // --- PERMISSION LOGIC ---
+  // Everyone sees all projects (Collaboration mode), but only Admins can create.
+  const visibleProjects = useMemo(() => {
+      if (!currentUser) return [];
+      return projects;
+  }, [projects, currentUser]);
+
+  const activeProjects = useMemo(() => visibleProjects.filter(p => p.status === 'active'), [visibleProjects]);
+  const completedProjects = useMemo(() => visibleProjects.filter(p => p.status === 'completed'), [visibleProjects]);
+  
+  const currentProject = projects.find(p => p.id === currentProjectId);
 
   // --- Init Data from Backend ---
   useEffect(() => {
@@ -240,8 +247,6 @@ function App() {
         setProjects(fetchedProjects);
     });
 
-    // Load Tickets (Simulated for this demo, would be from backend in real app)
-    // For now we start empty or load from local storage
     const savedTickets = localStorage.getItem('ajm_support_tickets');
     if (savedTickets) {
         setSupportTickets(JSON.parse(savedTickets));
@@ -287,8 +292,13 @@ function App() {
 
   // --- User Handlers ---
   const handleAddUser = async (newUser: User & { password?: string }) => {
-      const created = await userService.createUser(newUser);
-      setUsers(prev => [...prev, created]);
+      try {
+        const created = await userService.createUser(newUser);
+        setUsers(prev => [...prev, created]);
+      } catch (e) {
+          console.error(e);
+          alert("Não foi possível criar o usuário. Verifique se o nome já está em uso.");
+      }
   };
 
   const handleUpdateUser = async (updatedUser: User & { password?: string }) => {
@@ -313,13 +323,14 @@ function App() {
   };
 
   const handleCreateProject = () => {
-    // Removed isAdmin check to allow all users to create projects
+    if (!currentUser) return;
     const newProject: Project = {
       id: crypto.randomUUID(),
       title: 'Sem Título',
       icon: '📄',
       updatedAt: new Date(),
       status: 'active',
+      createdBy: currentUser.id, // Assign Ownership
       content: '',
       kanbanData: [
         { id: 'todo', title: 'A Fazer', tasks: [] },
@@ -338,45 +349,68 @@ function App() {
     setViewType(ViewType.DOCUMENT);
   };
 
+  // Simplified to only create Campaign
+  const handleCreateCampaign = () => {
+      if (!currentUser) return;
+      
+      const newProject: Project = {
+          id: crypto.randomUUID(),
+          title: 'Nova Campanha de Marketing',
+          icon: '📢',
+          updatedAt: new Date(),
+          status: 'active',
+          createdBy: currentUser.id,
+          content: '# Briefing da Campanha\n\n**Objetivo:** Aumentar vendas Q3.\n**Público Alvo:** PME.\n\n## Canais\n- [ ] Instagram\n- [ ] LinkedIn\n- [ ] Email Marketing',
+          kanbanData: [
+              { id: 'c1', title: 'Ideação', tasks: [] },
+              { id: 'c2', title: 'Produção', tasks: [] },
+              { id: 'c3', title: 'Aprovação', tasks: [] },
+              { id: 'c4', title: 'No Ar', tasks: [] }
+          ],
+          ishikawaData: { effect: "Problema", categories: [] },
+          scrumData: { backlog: [], sprints: [] }
+      };
+
+      const newProjects = [newProject, ...projects];
+      saveProjectsChanges(newProjects);
+      
+      setCurrentProjectId(newProject.id);
+      setNavState('PROJECT');
+      setViewType(ViewType.KANBAN);
+  };
+
   const handleCreateTemplateProject = (type: 'kanban' | 'ishikawa') => {
-    // Removed isAdmin check and error toast
+    if (!currentUser) return;
     const newProject: Project = {
       id: crypto.randomUUID(),
       title: type === 'kanban' ? 'Tutorial Kanban' : 'Tutorial Ishikawa',
       icon: type === 'kanban' ? '📋' : '🐟',
       updatedAt: new Date(),
       status: 'active',
+      createdBy: currentUser.id,
       content: type === 'kanban' 
-        ? '# Tutorial Kanban\n\nEste projeto foi criado automaticamente para demonstrar o uso do quadro Kanban.\n\nUse este quadro para gerenciar tarefas, arrastar itens entre colunas e acompanhar o progresso.'
-        : '# Tutorial Ishikawa\n\nEste projeto foi criado automaticamente para demonstrar o Diagrama de Ishikawa.\n\nUse este diagrama para analisar causas raízes de problemas.',
+        ? '# Tutorial Kanban\n\nEste projeto foi criado automaticamente para demonstrar o uso do quadro Kanban.'
+        : '# Tutorial Ishikawa\n\nEste projeto foi criado automaticamente para demonstrar o Diagrama de Ishikawa.',
       kanbanData: [
         { 
             id: 'todo', title: 'A Fazer', color: '#EF4444', 
             tasks: [
-                { id: crypto.randomUUID(), content: 'Bem-vindo ao Kanban!', priority: 'Low', icon: '👋' },
-                { id: crypto.randomUUID(), content: 'Arraste este cartão para a direita', priority: 'Medium', icon: '➡️' }
+                { id: crypto.randomUUID(), content: 'Bem-vindo ao Kanban!', priority: 'Low', icon: '👋' }
             ] 
         },
         { 
             id: 'prog', title: 'Em Progresso', color: '#3B82F6', 
-            tasks: [
-                { id: crypto.randomUUID(), content: 'Estudando o sistema', priority: 'High', icon: '📖' }
-            ] 
+            tasks: [] 
         },
         { 
             id: 'done', title: 'Concluído', color: '#10B981', 
-            tasks: [
-                { id: crypto.randomUUID(), content: 'Projeto Criado', priority: 'Low', icon: '✅' }
-            ] 
+            tasks: [] 
         }
       ],
       ishikawaData: { 
           effect: "Atraso no Projeto", 
           categories: [
-              { name: "Método", causes: ["Processo não definido", "Falta de padrão"] },
-              { name: "Material", causes: ["Ferramentas lentas"] },
-              { name: "Mão de obra", causes: ["Falta de treinamento", "Equipe reduzida"] },
-              { name: "Meio Ambiente", causes: ["Barulho excessivo"] }
+              { name: "Método", causes: ["Processo não definido"] }
           ] 
       },
       scrumData: { backlog: [], sprints: [] }
@@ -396,7 +430,6 @@ function App() {
   };
 
   const toggleProjectStatus = (id: string) => {
-      // Removed isAdmin check to allow users to archive/restore
       const project = projects.find(p => p.id === id);
       if (!project) return;
       
@@ -464,10 +497,6 @@ function App() {
       
       const isPrivate = msg.recipientId === currentUser.username;
       
-      // Notify if: 
-      // 1. It is a private message for me (High Priority)
-      // 2. OR It is a global message AND chat is closed
-      
       if (isPrivate || !isChatOpen) {
           const sender = users.find(u => u.username === msg.senderId)?.name || msg.senderId;
           const prefix = isPrivate ? 'Mensagem Privada' : 'Chat da Equipe';
@@ -476,9 +505,7 @@ function App() {
               message: `🔔 ${prefix} de ${sender}: "${msg.text.substring(0, 20)}${msg.text.length > 20 ? '...' : ''}"`
           });
           
-          // Play notification sound (Simple beep using standard browser API if allowed)
           try {
-              // Using a reliable CDN for a simple UI beep
               const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); 
               audio.volume = 0.5;
               audio.play().catch(e => console.log('Audio autoplay blocked', e));
@@ -540,7 +567,7 @@ function App() {
     }`}>
       <div className="p-4 flex items-center justify-between group">
         <div className="flex items-center gap-2 font-medium truncate">
-          <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center text-xs text-white">A</div>
+          <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center text-xs text-white font-bold">A</div>
           <span>AJM OneSystem</span>
         </div>
       </div>
@@ -562,7 +589,7 @@ function App() {
                 onClick={() => { setNavState('ADMIN_DASHBOARD'); setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'ADMIN_DASHBOARD' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
             >
-                <LayoutDashboard size={16} /> Painel
+                <LayoutDashboard size={16} className="text-blue-400" /> Painel Admin
             </button>
         )}
 
@@ -591,7 +618,7 @@ function App() {
       <div className="mt-6 px-4 flex-1 overflow-y-auto">
         {/* ACTIVE PROJECTS */}
         <div className="text-xs font-semibold text-notion-muted mb-2 flex justify-between items-center">
-            <span>LISTAS</span>
+            <span>{isAdmin ? 'TODOS OS PROJETOS' : 'MEUS PROJETOS'}</span>
             <Plus size={14} className="cursor-pointer hover:text-white" onClick={handleCreateProject}/>
         </div>
         <div className="space-y-0.5 mb-6">
@@ -629,7 +656,7 @@ function App() {
                     onClick={() => setIsCompletedOpen(!isCompletedOpen)}
                  >
                      <ChevronDown size={12} className={`transition-transform ${!isCompletedOpen ? '-rotate-90' : ''}`}/>
-                     <span>CONCLUÍDO</span>
+                     <span>ARQUIVADOS</span>
                  </div>
                  {isCompletedOpen && (
                     <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200">
@@ -675,7 +702,7 @@ function App() {
                   </div>
                   <div className="flex flex-col">
                       <span className="text-sm font-medium">{currentUser?.name}</span>
-                      <span className="text-[10px] text-notion-muted capitalize">{currentUser?.role}</span>
+                      <span className="text-[10px] text-notion-muted capitalize">{currentUser?.role === 'admin' ? 'Administrador' : 'Usuário'}</span>
                   </div>
               </div>
               <button 
@@ -702,10 +729,62 @@ function App() {
       {appSettings.showGreeting && (
           <div className="text-center mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
             <h1 className="text-4xl font-bold mb-2">Boa tarde, {currentUser?.name}</h1>
-            <p className="text-notion-muted text-sm">Logado como {currentUser?.role}</p>
+            <p className="text-notion-muted text-sm">
+                {isAdmin ? 'Você tem acesso administrativo completo.' : 'Bem-vindo ao seu espaço de trabalho.'}
+            </p>
           </div>
       )}
 
+      {/* --- ADMIN QUICK ACTIONS ROW --- */}
+      {isAdmin && (
+          <div className="mb-12">
+            <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <ShieldCheck size={14}/> Atalhos Administrativos
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                 {/* Create Campaign */}
+                 <div onClick={handleCreateCampaign} className="bg-[#202020] hover:bg-[#2C2C2C] border border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group">
+                     <div className="flex items-center justify-between mb-3">
+                         <div className="p-2 bg-purple-900/30 text-purple-400 rounded-lg">
+                             <Briefcase size={20}/>
+                         </div>
+                         <Plus size={16} className="text-gray-500 group-hover:text-white"/>
+                     </div>
+                     <h3 className="font-semibold text-sm text-gray-200">Nova Campanha</h3>
+                     <p className="text-xs text-notion-muted mt-1">Template de Marketing</p>
+                 </div>
+
+                 {/* Manage Users */}
+                 <div onClick={() => { setIsSettingsOpen(true); }} className="bg-[#202020] hover:bg-[#2C2C2C] border border-[#333] hover:border-orange-500/50 p-4 rounded-lg cursor-pointer transition-all group">
+                     <div className="flex items-center justify-between mb-3">
+                         <div className="p-2 bg-orange-900/30 text-orange-400 rounded-lg">
+                             <UserIcon size={20}/>
+                         </div>
+                         <ChevronRight size={16} className="text-gray-500 group-hover:text-white"/>
+                     </div>
+                     <h3 className="font-semibold text-sm text-gray-200">Gerenciar Admins</h3>
+                     <p className="text-xs text-notion-muted mt-1">Controle de Usuários</p>
+                 </div>
+
+                 {/* Admin Dash */}
+                 <div onClick={() => setNavState('ADMIN_DASHBOARD')} className="bg-[#202020] hover:bg-[#2C2C2C] border border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group">
+                     <div className="flex items-center justify-between mb-3">
+                         <div className="p-2 bg-blue-900/30 text-blue-400 rounded-lg">
+                             <LayoutDashboard size={20}/>
+                         </div>
+                         <ChevronRight size={16} className="text-gray-500 group-hover:text-white"/>
+                     </div>
+                     <h3 className="font-semibold text-sm text-gray-200">Dashboard Global</h3>
+                     <p className="text-xs text-notion-muted mt-1">Visão Geral do Sistema</p>
+                 </div>
+            </div>
+          </div>
+      )}
+
+      {/* --- STANDARD PROJECT LIST --- */}
+      <h2 className="text-sm font-semibold text-notion-muted uppercase mb-4">
+          {isAdmin ? 'Projetos Recentes (Visão Global)' : 'Projetos Recentes'}
+      </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {/* Recently Visited Cards */}
         {activeProjects.slice(0, 4).map(p => (
@@ -750,22 +829,25 @@ function App() {
                 <div className="font-medium text-sm mb-1 truncate">{p.title}</div>
                 <div className="flex items-center text-xs text-notion-muted gap-1">
                     <Clock size={12} /> {p.updatedAt.toLocaleDateString()}
+                    {isAdmin && p.createdBy && p.createdBy !== currentUser.id && (
+                        <span className="ml-auto bg-gray-700 px-1 rounded text-[10px] text-gray-300">Compartilhado</span>
+                    )}
                 </div>
              </div>
            </div>
         ))}
-        {/* New Project Card - Accessible to all */}
+        {/* New Project Card - For Everyone */}
         <div 
             onClick={handleCreateProject}
             className="bg-notion-card p-4 rounded-lg hover:bg-notion-hover cursor-pointer group flex flex-col items-center justify-center text-notion-muted hover:text-white h-32 border border-dashed border-[#444] hover:border-gray-500"
         >
             <Plus size={24} className="mb-2"/>
-            <span className="text-sm">Novo Projeto</span>
+            <span className="text-sm">Novo Projeto em Branco</span>
         </div>
       </div>
 
       <div className="mb-8">
-         <h2 className="text-sm font-semibold text-notion-muted uppercase mb-4">Aprenda</h2>
+         <h2 className="text-sm font-semibold text-notion-muted uppercase mb-4">Tutoriais</h2>
          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div onClick={() => handleCreateTemplateProject('kanban')} className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20 transition-transform hover:scale-[1.02]">
                  <div className="h-24 bg-gradient-to-r from-blue-900 to-slate-900 flex items-center justify-center">
@@ -825,7 +907,6 @@ function App() {
                 {currentProject.status === 'completed' && (
                     <div className="flex items-center gap-2">
                             <span className="bg-orange-500/20 text-orange-400 text-[10px] px-1.5 py-0.5 rounded border border-orange-500/30 select-none">ARQUIVADO</span>
-                            {/* Allow anyone to restore if they have access */}
                             <button 
                                 onClick={() => toggleProjectStatus(currentProject.id)}
                                 className="flex items-center gap-1 bg-white/5 hover:bg-white/10 text-[10px] text-notion-muted hover:text-white px-2 py-0.5 rounded transition-colors border border-white/5 hover:border-white/10"
