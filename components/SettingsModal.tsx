@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check } from 'lucide-react';
+import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check, Moon, Sun } from 'lucide-react';
 import { User, UserRole, AppSettings } from '../types';
 
 interface Props {
@@ -354,6 +354,24 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                     <h2 className="text-xl font-bold text-white mb-6">Aparência do Espaço de Trabalho</h2>
 
                     <div className="space-y-4">
+                        <div className="bg-[#202020] p-4 rounded-lg border border-[#333] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-900/20 text-blue-400 rounded">
+                                    {appSettings.theme === 'light' ? <Sun size={20}/> : <Moon size={20}/>}
+                                </div>
+                                <div>
+                                    <h3 className="font-medium text-white">Tema do Sistema</h3>
+                                    <p className="text-xs text-gray-500">Alternar entre modo claro e escuro.</p>
+                                </div>
+                            </div>
+                            <div 
+                                onClick={() => setAppSettings({ ...appSettings, theme: appSettings.theme === 'light' ? 'dark' : 'light' })}
+                                className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${appSettings.theme === 'light' ? 'bg-gray-500' : 'bg-blue-600'}`}
+                            >
+                                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${appSettings.theme === 'light' ? 'translate-x-0' : 'translate-x-6'}`}></div>
+                            </div>
+                        </div>
+
                         <div className="bg-[#202020] p-4 rounded-lg border border-[#333] flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <Layout size={20} className="text-gray-400"/>

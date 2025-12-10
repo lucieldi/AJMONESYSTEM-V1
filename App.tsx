@@ -192,9 +192,9 @@ function App() {
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
       try {
           const saved = localStorage.getItem('ajm_app_settings');
-          return saved ? JSON.parse(saved) : { showSidebar: true, showBreadcrumbs: true, showGreeting: true };
+          return saved ? JSON.parse(saved) : { showSidebar: true, showBreadcrumbs: true, showGreeting: true, theme: 'dark' };
       } catch {
-          return { showSidebar: true, showBreadcrumbs: true, showGreeting: true };
+          return { showSidebar: true, showBreadcrumbs: true, showGreeting: true, theme: 'dark' };
       }
   });
 
@@ -253,9 +253,23 @@ function App() {
     }
   }, []);
 
-  // Persist settings
+  // Persist settings & Apply Theme
   useEffect(() => {
     localStorage.setItem('ajm_app_settings', JSON.stringify(appSettings));
+    
+    // Apply Theme
+    const root = document.documentElement;
+    if (appSettings.theme === 'light') {
+        root.classList.remove('dark');
+        // Force background for body
+        document.body.style.backgroundColor = '#f3f4f6';
+        document.body.style.color = '#1f2937';
+    } else {
+        root.classList.add('dark');
+        document.body.style.backgroundColor = '#191919';
+        document.body.style.color = '#D4D4D4';
+    }
+
   }, [appSettings]);
 
   // Persist tickets (Simulated persistence)
@@ -492,7 +506,8 @@ function App() {
 
       // Only increment unread if chat is closed
       if (!isChatOpen) {
-          setUnreadMessages(prev => prev + 1);
+          // Note: GlobalChat calculates total unreads on sync, but for immediate feedback:
+          // We rely on GlobalChat's polling/sync to update the total count via setTotalUnread prop
       }
       
       const isPrivate = msg.recipientId === currentUser.username;
@@ -603,13 +618,13 @@ function App() {
         
         {/* Chat Toggle in Sidebar */}
         <button 
-            onClick={() => { setIsChatOpen(true); setUnreadMessages(0); setIsSidebarOpen(false); }}
+            onClick={() => { setIsChatOpen(true); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm relative ${isChatOpen ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
         >
           <MessageSquare size={16} /> Chat da Equipe
           {unreadMessages > 0 && !isChatOpen && (
-              <span className="absolute right-2 bg-red-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
-                  {unreadMessages}
+              <span className="absolute right-2 bg-red-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
               </span>
           )}
         </button>
@@ -728,8 +743,8 @@ function App() {
       <div className="p-12 max-w-5xl mx-auto w-full relative z-10">
       {appSettings.showGreeting && (
           <div className="text-center mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
-            <h1 className="text-4xl font-bold mb-2">Boa tarde, {currentUser?.name}</h1>
-            <p className="text-notion-muted text-sm">
+            <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">Boa tarde, {currentUser?.name}</h1>
+            <p className="text-gray-500 dark:text-notion-muted text-sm">
                 {isAdmin ? 'Você tem acesso administrativo completo.' : 'Bem-vindo ao seu espaço de trabalho.'}
             </p>
           </div>
@@ -743,46 +758,46 @@ function App() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                  {/* Create Campaign */}
-                 <div onClick={handleCreateCampaign} className="bg-[#202020] hover:bg-[#2C2C2C] border border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group">
+                 <div onClick={handleCreateCampaign} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
                      <div className="flex items-center justify-between mb-3">
-                         <div className="p-2 bg-purple-900/30 text-purple-400 rounded-lg">
+                         <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
                              <Briefcase size={20}/>
                          </div>
-                         <Plus size={16} className="text-gray-500 group-hover:text-white"/>
+                         <Plus size={16} className="text-gray-400 dark:text-gray-500 group-hover:text-black dark:group-hover:text-white"/>
                      </div>
-                     <h3 className="font-semibold text-sm text-gray-200">Nova Campanha</h3>
-                     <p className="text-xs text-notion-muted mt-1">Template de Marketing</p>
+                     <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-200">Nova Campanha</h3>
+                     <p className="text-xs text-gray-500 dark:text-notion-muted mt-1">Template de Marketing</p>
                  </div>
 
                  {/* Manage Users */}
-                 <div onClick={() => { setIsSettingsOpen(true); }} className="bg-[#202020] hover:bg-[#2C2C2C] border border-[#333] hover:border-orange-500/50 p-4 rounded-lg cursor-pointer transition-all group">
+                 <div onClick={() => { setIsSettingsOpen(true); }} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-orange-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
                      <div className="flex items-center justify-between mb-3">
-                         <div className="p-2 bg-orange-900/30 text-orange-400 rounded-lg">
+                         <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg">
                              <UserIcon size={20}/>
                          </div>
-                         <ChevronRight size={16} className="text-gray-500 group-hover:text-white"/>
+                         <ChevronRight size={16} className="text-gray-400 dark:text-gray-500 group-hover:text-black dark:group-hover:text-white"/>
                      </div>
-                     <h3 className="font-semibold text-sm text-gray-200">Gerenciar Admins</h3>
-                     <p className="text-xs text-notion-muted mt-1">Controle de Usuários</p>
+                     <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-200">Gerenciar Admins</h3>
+                     <p className="text-xs text-gray-500 dark:text-notion-muted mt-1">Controle de Usuários</p>
                  </div>
 
                  {/* Admin Dash */}
-                 <div onClick={() => setNavState('ADMIN_DASHBOARD')} className="bg-[#202020] hover:bg-[#2C2C2C] border border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group">
+                 <div onClick={() => setNavState('ADMIN_DASHBOARD')} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
                      <div className="flex items-center justify-between mb-3">
-                         <div className="p-2 bg-blue-900/30 text-blue-400 rounded-lg">
+                         <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
                              <LayoutDashboard size={20}/>
                          </div>
-                         <ChevronRight size={16} className="text-gray-500 group-hover:text-white"/>
+                         <ChevronRight size={16} className="text-gray-400 dark:text-gray-500 group-hover:text-black dark:group-hover:text-white"/>
                      </div>
-                     <h3 className="font-semibold text-sm text-gray-200">Dashboard Global</h3>
-                     <p className="text-xs text-notion-muted mt-1">Visão Geral do Sistema</p>
+                     <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-200">Dashboard Global</h3>
+                     <p className="text-xs text-gray-500 dark:text-notion-muted mt-1">Visão Geral do Sistema</p>
                  </div>
             </div>
           </div>
       )}
 
       {/* --- STANDARD PROJECT LIST --- */}
-      <h2 className="text-sm font-semibold text-notion-muted uppercase mb-4">
+      <h2 className="text-sm font-semibold text-gray-500 dark:text-notion-muted uppercase mb-4">
           {isAdmin ? 'Projetos Recentes (Visão Global)' : 'Projetos Recentes'}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -791,7 +806,7 @@ function App() {
            <div 
              key={p.id} 
              onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); }}
-             className="bg-notion-card rounded-lg hover:bg-notion-hover cursor-pointer group transition-all overflow-hidden flex flex-col h-32 relative shadow-lg shadow-black/20"
+             className="bg-white dark:bg-notion-card rounded-lg hover:bg-gray-50 dark:hover:bg-notion-hover cursor-pointer group transition-all overflow-hidden flex flex-col h-32 relative shadow-sm dark:shadow-lg dark:shadow-black/20 border border-gray-200 dark:border-transparent"
            >
              {/* Card Cover */}
              <div 
@@ -826,11 +841,11 @@ function App() {
                         </div>
                     )}
                 </div>
-                <div className="font-medium text-sm mb-1 truncate">{p.title}</div>
-                <div className="flex items-center text-xs text-notion-muted gap-1">
+                <div className="font-medium text-sm mb-1 truncate text-gray-900 dark:text-gray-200">{p.title}</div>
+                <div className="flex items-center text-xs text-gray-500 dark:text-notion-muted gap-1">
                     <Clock size={12} /> {p.updatedAt.toLocaleDateString()}
                     {isAdmin && p.createdBy && p.createdBy !== currentUser.id && (
-                        <span className="ml-auto bg-gray-700 px-1 rounded text-[10px] text-gray-300">Compartilhado</span>
+                        <span className="ml-auto bg-gray-200 dark:bg-gray-700 px-1 rounded text-[10px] text-gray-600 dark:text-gray-300">Compartilhado</span>
                     )}
                 </div>
              </div>
@@ -839,7 +854,7 @@ function App() {
         {/* New Project Card - For Everyone */}
         <div 
             onClick={handleCreateProject}
-            className="bg-notion-card p-4 rounded-lg hover:bg-notion-hover cursor-pointer group flex flex-col items-center justify-center text-notion-muted hover:text-white h-32 border border-dashed border-[#444] hover:border-gray-500"
+            className="bg-white dark:bg-notion-card p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-notion-hover cursor-pointer group flex flex-col items-center justify-center text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white h-32 border border-dashed border-gray-300 dark:border-[#444] hover:border-gray-500"
         >
             <Plus size={24} className="mb-2"/>
             <span className="text-sm">Novo Projeto em Branco</span>
@@ -847,24 +862,24 @@ function App() {
       </div>
 
       <div className="mb-8">
-         <h2 className="text-sm font-semibold text-notion-muted uppercase mb-4">Tutoriais</h2>
+         <h2 className="text-sm font-semibold text-gray-500 dark:text-notion-muted uppercase mb-4">Tutoriais</h2>
          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <div onClick={() => handleCreateTemplateProject('kanban')} className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20 transition-transform hover:scale-[1.02]">
+             <div onClick={() => handleCreateTemplateProject('kanban')} className="bg-white dark:bg-notion-card rounded-lg overflow-hidden hover:bg-gray-50 dark:hover:bg-notion-hover cursor-pointer shadow-sm dark:shadow-lg dark:shadow-black/20 transition-transform hover:scale-[1.02] border border-gray-200 dark:border-transparent">
                  <div className="h-24 bg-gradient-to-r from-blue-900 to-slate-900 flex items-center justify-center">
                      <Trello size={32} className="text-white/50"/>
                  </div>
                  <div className="p-3">
-                     <h3 className="font-medium text-sm mb-1 text-white">Começando com Kanbans</h3>
-                     <p className="text-xs text-notion-muted">Organize suas tarefas de forma eficaz.</p>
+                     <h3 className="font-medium text-sm mb-1 text-gray-900 dark:text-white">Começando com Kanbans</h3>
+                     <p className="text-xs text-gray-500 dark:text-notion-muted">Organize suas tarefas de forma eficaz.</p>
                  </div>
              </div>
-             <div onClick={() => handleCreateTemplateProject('ishikawa')} className="bg-notion-card rounded-lg overflow-hidden hover:bg-notion-hover cursor-pointer shadow-lg shadow-black/20 transition-transform hover:scale-[1.02]">
+             <div onClick={() => handleCreateTemplateProject('ishikawa')} className="bg-white dark:bg-notion-card rounded-lg overflow-hidden hover:bg-gray-50 dark:hover:bg-notion-hover cursor-pointer shadow-sm dark:shadow-lg dark:shadow-black/20 transition-transform hover:scale-[1.02] border border-gray-200 dark:border-transparent">
                  <div className="h-24 bg-gradient-to-r from-green-900 to-teal-900 flex items-center justify-center">
                      <GitMerge size={32} className="text-white/50 rotate-90"/>
                  </div>
                  <div className="p-3">
-                     <h3 className="font-medium text-sm mb-1 text-white">Básico de Ishikawa</h3>
-                     <p className="text-xs text-notion-muted">Encontre a causa raiz de qualquer problema.</p>
+                     <h3 className="font-medium text-sm mb-1 text-gray-900 dark:text-white">Básico de Ishikawa</h3>
+                     <p className="text-xs text-gray-500 dark:text-notion-muted">Encontre a causa raiz de qualquer problema.</p>
                  </div>
              </div>
          </div>
@@ -879,15 +894,15 @@ function App() {
     return (
       <div 
         className="flex flex-col h-full overflow-hidden transition-colors duration-500"
-        style={{ backgroundColor: currentProject.theme || '#191919' }}
+        style={{ backgroundColor: currentProject.theme || (appSettings.theme === 'light' ? '#ffffff' : '#191919') }}
       >
         {/* Project Header (Top Bar) */}
         {appSettings.showBreadcrumbs && (
             <div className={`h-12 flex items-center justify-between px-4 sticky top-0 z-20 bg-inherit/90 backdrop-blur-sm ${!isSidebarOpen && appSettings.showSidebar ? 'pl-14' : ''}`}>
             <div className="flex items-center gap-2">
-                <span className="text-notion-muted text-sm cursor-pointer hover:underline" onClick={() => setNavState('HOME')}>Início</span>
-                <span className="text-notion-muted">/</span>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 cursor-pointer text-sm font-medium">
+                <span className="text-gray-500 dark:text-notion-muted text-sm cursor-pointer hover:underline" onClick={() => setNavState('HOME')}>Início</span>
+                <span className="text-gray-500 dark:text-notion-muted">/</span>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-200">
                     <span className="emoji-trigger relative" onClick={(e) => {
                         e.stopPropagation();
                         setPickerTarget(pickerTarget === 'header' ? null : 'header');
@@ -918,21 +933,21 @@ function App() {
                 )}
             </div>
             <div className="flex items-center gap-3 relative">
-                <span className="text-xs text-notion-muted">Editado {currentProject.updatedAt.toLocaleTimeString()}</span>
+                <span className="text-xs text-gray-500 dark:text-notion-muted">Editado {currentProject.updatedAt.toLocaleTimeString()}</span>
                 
                 {/* Customization Menu - Accessible to all */}
                 <div className="relative" ref={styleMenuRef}>
                         <button 
                             onClick={() => setShowStyleMenu(!showStyleMenu)}
-                            className="text-notion-muted hover:text-white p-1 hover:bg-white/10 rounded"
+                            className="text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded"
                         >
                             <MoreHorizontal size={18}/>
                         </button>
                         {showStyleMenu && (
-                            <div className="absolute right-0 top-8 w-72 bg-[#2C2C2C] border border-[#444] rounded-lg shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-4">
+                            <div className="absolute right-0 top-8 w-72 bg-white dark:bg-[#2C2C2C] border border-gray-200 dark:border-[#444] rounded-lg shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-4">
                                 {/* Cover Image Section */}
                                 <div>
-                                    <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-notion-muted mb-2 uppercase flex items-center gap-2">
                                         <ImageIcon size={12}/> Imagem de Capa
                                     </div>
                                     <div className="grid grid-cols-5 gap-1 mb-2">
@@ -940,7 +955,7 @@ function App() {
                                             <div 
                                                 key={i}
                                                 onClick={() => updateProject(currentProject.id, { cover: cover === '#2C2C2C' ? undefined : cover })}
-                                                className="h-8 rounded cursor-pointer hover:ring-2 ring-white/50 transition-all border border-white/10"
+                                                className="h-8 rounded cursor-pointer hover:ring-2 ring-blue-500 transition-all border border-gray-200 dark:border-white/10"
                                                 style={{ background: cover }}
                                                 title="Alterar Capa"
                                             />
@@ -948,7 +963,7 @@ function App() {
                                     </div>
                                     <button 
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full text-xs text-notion-muted hover:text-white bg-[#333] hover:bg-[#444] border border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors mb-2"
+                                        className="w-full text-xs text-gray-600 dark:text-notion-muted hover:text-black dark:hover:text-white bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] border border-gray-200 dark:border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors mb-2"
                                     >
                                         <Upload size={12}/> Carregar Personalizada
                                     </button>
@@ -962,7 +977,7 @@ function App() {
                                                     setShowStyleMenu(false);
                                                 }
                                             }}
-                                            className="w-full text-xs text-notion-muted hover:text-white bg-[#333] hover:bg-[#444] border border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors"
+                                            className="w-full text-xs text-gray-600 dark:text-notion-muted hover:text-black dark:hover:text-white bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] border border-gray-200 dark:border-[#444] rounded py-1.5 flex items-center justify-center gap-2 transition-colors"
                                         >
                                             <MoveVertical size={12}/> Reposicionar
                                         </button>
@@ -978,13 +993,13 @@ function App() {
 
                                 {/* Cover Text Section */}
                                 <div>
-                                    <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-notion-muted mb-2 uppercase flex items-center gap-2">
                                         <Type size={12}/> Texto do Banner
                                     </div>
                                     <input 
                                         type="text"
                                         placeholder="Adicione texto ao banner..."
-                                        className="w-full bg-[#191919] border border-[#444] rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:border-blue-500 outline-none"
+                                        className="w-full bg-gray-50 dark:bg-[#191919] border border-gray-200 dark:border-[#444] rounded px-2 py-1.5 text-xs text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:border-blue-500 outline-none"
                                         value={currentProject.coverText || ''}
                                         onChange={(e) => updateProject(currentProject.id, { coverText: e.target.value })}
                                     />
@@ -992,7 +1007,7 @@ function App() {
 
                                 {/* Theme Section */}
                                 <div>
-                                    <div className="text-xs font-semibold text-notion-muted mb-2 uppercase flex items-center gap-2">
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-notion-muted mb-2 uppercase flex items-center gap-2">
                                         <Palette size={12}/> Tema de Fundo
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -1057,7 +1072,7 @@ function App() {
                     </div>
                 </div>
             ) : (
-                <div className="h-12 w-full group-hover:bg-white/5 transition-colors flex items-center px-12 text-sm text-notion-muted opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => setShowStyleMenu(true)}>
+                <div className="h-12 w-full group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-colors flex items-center px-12 text-sm text-gray-400 dark:text-notion-muted opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => setShowStyleMenu(true)}>
                     <ImageIcon size={14} className="mr-2"/> Adicionar Capa
                 </div>
             )}
@@ -1067,35 +1082,35 @@ function App() {
         <div className="px-12 pb-4 flex flex-col h-full overflow-hidden">
             <div className="group relative mb-6 mt-8 z-30">
                  <input 
-                    className="text-4xl font-bold bg-transparent border-none outline-none w-full text-white placeholder-white/20"
+                    className="text-4xl font-bold bg-transparent border-none outline-none w-full text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/20"
                     value={currentProject.title}
                     onChange={(e) => updateProject(currentProject.id, { title: e.target.value })}
                     placeholder="Sem Título"
                  />
             </div>
 
-            <div className="flex items-center gap-4 border-b border-white/10 mb-6 shrink-0 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-4 border-b border-gray-200 dark:border-white/10 mb-6 shrink-0 overflow-x-auto no-scrollbar">
                 <button 
                     onClick={() => setViewType(ViewType.DOCUMENT)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.DOCUMENT ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.DOCUMENT ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
                 >
                     <FileText size={16}/> Documento
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.KANBAN)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.KANBAN ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.KANBAN ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
                 >
                     <Trello size={16}/> Kanban
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.ISHIKAWA)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.ISHIKAWA ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.ISHIKAWA ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
                 >
                     <GitMerge size={16} className="rotate-90"/> Ishikawa
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.SCRUM)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.SCRUM ? 'border-b-2 border-white text-white' : 'text-notion-muted hover:text-white'}`}
+                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.SCRUM ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
                 >
                     <ListTodo size={16}/> Scrum
                 </button>
@@ -1105,7 +1120,7 @@ function App() {
             <div className="flex-1 overflow-hidden min-h-0">
                 {viewType === ViewType.DOCUMENT && (
                     <textarea 
-                        className="w-full h-full bg-transparent resize-none outline-none text-gray-300 leading-relaxed p-4"
+                        className="w-full h-full bg-transparent resize-none outline-none text-gray-800 dark:text-gray-300 leading-relaxed p-4"
                         placeholder="Digite '/' para comandos..."
                         value={currentProject.content}
                         onChange={(e) => updateProject(currentProject.id, { content: e.target.value })}
@@ -1115,11 +1130,11 @@ function App() {
                 {viewType === ViewType.KANBAN && (
                     <div className="h-full flex flex-col">
                         <div className="flex justify-between items-center mb-4 shrink-0 gap-2">
-                            <p className="text-sm text-notion-muted truncate">Arraste os cartões para atualizar o status.</p>
+                            <p className="text-sm text-gray-500 dark:text-notion-muted truncate">Arraste os cartões para atualizar o status.</p>
                             <button 
                                 onClick={handleGenerateKanban}
                                 disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-purple-600/20 text-purple-300 px-3 py-1.5 rounded text-xs hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap"
+                                className="flex items-center gap-2 bg-purple-100 dark:bg-purple-600/20 text-purple-600 dark:text-purple-300 px-3 py-1.5 rounded text-xs hover:bg-purple-200 dark:hover:bg-purple-600/30 transition-colors border border-purple-200 dark:border-purple-500/30 whitespace-nowrap"
                             >
                                 <Brain size={14} />
                                 {isAiLoading ? 'Gerando...' : 'Gerar Colunas Automaticamente'}
@@ -1138,13 +1153,13 @@ function App() {
                 {viewType === ViewType.ISHIKAWA && (
                     <div className="h-full flex flex-col">
                          <div className="flex justify-between items-center mb-4 shrink-0">
-                             <div className="text-sm text-notion-muted truncate max-w-[200px] md:max-w-none">
-                                 Efeito: <span className="text-white font-semibold">{currentProject.ishikawaData.effect}</span>
+                             <div className="text-sm text-gray-500 dark:text-notion-muted truncate max-w-[200px] md:max-w-none">
+                                 Efeito: <span className="text-black dark:text-white font-semibold">{currentProject.ishikawaData.effect}</span>
                              </div>
                              <button 
                                 onClick={handleGenerateIshikawa}
                                 disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-blue-600/20 text-blue-300 px-3 py-1.5 rounded text-xs hover:bg-blue-600/30 transition-colors border border-blue-500/30 whitespace-nowrap"
+                                className="flex items-center gap-2 bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-300 px-3 py-1.5 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-600/30 transition-colors border border-blue-200 dark:border-blue-500/30 whitespace-nowrap"
                             >
                                 <Brain size={14} />
                                 {isAiLoading ? 'Analisando...' : 'Gerar com IA'}
@@ -1159,11 +1174,11 @@ function App() {
                 {viewType === ViewType.SCRUM && (
                      <div className="h-full flex flex-col">
                         <div className="flex justify-between items-center mb-4 shrink-0 gap-2">
-                            <p className="text-sm text-notion-muted truncate">Planeje sprints movendo itens do backlog.</p>
+                            <p className="text-sm text-gray-500 dark:text-notion-muted truncate">Planeje sprints movendo itens do backlog.</p>
                             <button 
                                 onClick={handleGenerateBacklog}
                                 disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-green-600/20 text-green-300 px-3 py-1.5 rounded text-xs hover:bg-green-600/30 transition-colors border border-green-500/30 whitespace-nowrap"
+                                className="flex items-center gap-2 bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-300 px-3 py-1.5 rounded text-xs hover:bg-green-200 dark:hover:bg-green-600/30 transition-colors border border-green-200 dark:border-green-500/30 whitespace-nowrap"
                             >
                                 <Brain size={14} />
                                 {isAiLoading ? 'Gerando...' : 'Gerar Histórias de Usuário'}
@@ -1199,7 +1214,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-[#191919] text-[#D4D4D4] font-sans selection:bg-[#2383E2] selection:text-white overflow-hidden">
+    <div className={`flex h-screen font-sans selection:bg-[#2383E2] selection:text-white overflow-hidden transition-colors duration-300 ${appSettings.theme === 'light' ? 'bg-[#f3f4f6] text-[#1f2937]' : 'bg-[#191919] text-[#D4D4D4]'}`}>
       
       {/* Mobile Sidebar Backdrop */}
       {appSettings.showSidebar && isSidebarOpen && (
@@ -1212,7 +1227,7 @@ function App() {
       {/* Mobile Toggle */}
       {!isSidebarOpen && appSettings.showSidebar && (
           <div className="absolute top-4 left-4 z-50">
-             <Menu className="cursor-pointer text-notion-muted hover:text-white" onClick={() => setIsSidebarOpen(true)}/>
+             <Menu className="cursor-pointer text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white" onClick={() => setIsSidebarOpen(true)}/>
           </div>
       )}
 
@@ -1253,7 +1268,7 @@ function App() {
 
           {/* Toast Notification */}
           {toast && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-black px-4 py-3 rounded-md shadow-2xl flex items-center gap-4 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300 min-w-[300px] justify-between">
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-black px-4 py-3 rounded-md shadow-2xl flex items-center gap-4 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300 min-w-[300px] justify-between border border-gray-200">
                   <span className="text-sm font-medium">{toast.message}</span>
                   <div className="flex items-center gap-3">
                       {toast.onUndo && (
@@ -1280,6 +1295,7 @@ function App() {
             onNewMessage={handleChatNotification}
             currentUser={currentUser}
             users={users}
+            setTotalUnread={setUnreadMessages}
         />
       )}
 

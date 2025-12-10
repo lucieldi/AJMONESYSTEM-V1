@@ -10,12 +10,13 @@ interface Props {
   onNewMessage?: (message: ChatMessage) => void;
   currentUser: User;
   users: User[]; // List of registered users to resolve avatars
+  setTotalUnread?: (count: number) => void;
 }
 
 type UserStatus = 'online' | 'busy' | 'offline';
 type ChatView = 'contacts' | 'conversation';
 
-const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUser, users }) => {
+const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUser, users, setTotalUnread }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [currentView, setCurrentView] = useState<ChatView>('contacts');
@@ -26,8 +27,32 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
 
   const [statuses, setStatuses] = useState<Record<string, UserStatus>>({});
   
+  // Map of UserID/GLOBAL -> Timestamp of last read message
+  const [lastReadMap, setLastReadMap] = useState<Record<string, number>>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastNotifiedMsgId = useRef<string | null>(null);
+
+  // --- 0. LOAD READ STATUS FROM STORAGE ---
+  useEffect(() => {
+      const key = `ajm_chat_reads_${currentUser.id}`;
+      try {
+          const stored = localStorage.getItem(key);
+          if (stored) {
+              setLastReadMap(JSON.parse(stored));
+          }
+      } catch (e) {
+          console.warn("Could not load chat read history");
+      }
+  }, [currentUser.id]);
+
+  // Helper to update read status
+  const markAsRead = (contactId: string) => {
+      const now = Date.now();
+      const newMap = { ...lastReadMap, [contactId]: now };
+      setLastReadMap(newMap);
+      localStorage.setItem(`ajm_chat_reads_${currentUser.id}`, JSON.stringify(newMap));
+  };
 
   // --- 1. MESSAGE SYNC (POLLING) ---
   useEffect(() => {
@@ -36,7 +61,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
         const msgs = await chatService.getMessages();
         setMessages(msgs);
 
-        // Notificação de nova mensagem
+        // Notificação de nova mensagem (Toast)
         if (msgs.length > 0) {
             const latestMsg = msgs[msgs.length - 1];
             // Se a mensagem é nova e não fui eu que mandei
@@ -109,12 +134,43 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
   }, [currentUser.id, users]);
 
 
-  // Scroll to bottom when chat updates
+  // Scroll to bottom when chat updates & Mark as read if active
   useEffect(() => {
       if (currentView === 'conversation') {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          
+          // Mark current conversation as read
+          const contactKey = selectedContact === 'GLOBAL' ? 'GLOBAL' : selectedContact.id;
+          markAsRead(contactKey);
       }
-  }, [messages, isOpen, currentView]);
+  }, [messages, isOpen, currentView, selectedContact]);
+
+  // Calculate Total Unread for Sidebar Badge
+  useEffect(() => {
+      if (!setTotalUnread) return;
+
+      let total = 0;
+      
+      // 1. Check Global Unread
+      const globalLastRead = lastReadMap['GLOBAL'] || 0;
+      const unreadGlobal = messages.filter(m => !m.recipientId && new Date(m.timestamp).getTime() > globalLastRead).length;
+      total += unreadGlobal;
+
+      // 2. Check Private Unread for ALL users
+      users.forEach(u => {
+          if (u.id === currentUser.id) return;
+          const userLastRead = lastReadMap[u.id] || 0;
+          const unreadPrivate = messages.filter(m => 
+             m.senderId === u.username && 
+             m.recipientId === currentUser.username &&
+             new Date(m.timestamp).getTime() > userLastRead
+          ).length;
+          total += unreadPrivate;
+      });
+
+      setTotalUnread(total);
+  }, [messages, lastReadMap, users, currentUser, setTotalUnread]);
+
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -133,6 +189,10 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
     // Atualiza UI instantaneamente
     setMessages(prev => [...prev, newMsg]);
     setInputText('');
+
+    // Update read status for self immediately so it doesn't count as unread
+    const contactKey = selectedContact === 'GLOBAL' ? 'GLOBAL' : selectedContact.id;
+    markAsRead(contactKey);
 
     // Envia para o serviço (Backend)
     await chatService.sendMessage(newMsg);
@@ -175,6 +235,25 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
       return filtered[filtered.length - 1];
   };
 
+  // Helper to get unread count for contact list
+  const getUnreadCount = (contact: User | 'GLOBAL') => {
+      const lastReadTime = lastReadMap[contact === 'GLOBAL' ? 'GLOBAL' : contact.id] || 0;
+      
+      if (contact === 'GLOBAL') {
+          return messages.filter(m => 
+            !m.recipientId && 
+            new Date(m.timestamp).getTime() > lastReadTime &&
+            m.senderId !== currentUser.username // Don't count my own messages
+          ).length;
+      } else {
+          return messages.filter(m => 
+            m.senderId === contact.username && 
+            m.recipientId === currentUser.username &&
+            new Date(m.timestamp).getTime() > lastReadTime
+          ).length;
+      }
+  };
+
   // Helper to find user details
   const getUserDetails = (username: string) => {
       const found = users.find(u => u.username === username);
@@ -204,6 +283,8 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
     u.id !== currentUser.id && 
     u.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const globalUnreadCount = getUnreadCount('GLOBAL');
 
   if (!isOpen) return null;
 
@@ -269,7 +350,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                     {!searchTerm && (
                         <div 
                             onClick={() => { setSelectedContact('GLOBAL'); setCurrentView('conversation'); }}
-                            className="flex items-center gap-3 p-4 hover:bg-[#202020] cursor-pointer transition-colors border-b border-[#333]"
+                            className="flex items-center gap-3 p-4 hover:bg-[#202020] cursor-pointer transition-colors border-b border-[#333] relative"
                         >
                             <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-xl text-white shadow-lg shrink-0">
                                 <Users size={20}/>
@@ -283,12 +364,17 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs text-gray-400 truncate">
+                                <p className={`text-xs truncate ${globalUnreadCount > 0 ? 'font-bold text-white' : 'text-gray-400'}`}>
                                     {getLastMessage('GLOBAL') 
                                         ? `${getLastMessage('GLOBAL')!.senderId}: ${getLastMessage('GLOBAL')!.text}` 
                                         : 'Toque para conversar com todos'}
                                 </p>
                             </div>
+                            {globalUnreadCount > 0 && (
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md">
+                                    {globalUnreadCount > 9 ? '9+' : globalUnreadCount}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -301,12 +387,13 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                     {filteredContacts.map(user => {
                         const lastMsg = getLastMessage(user);
                         const status = statuses[user.id];
+                        const unreadCount = getUnreadCount(user);
                         
                         return (
                             <div 
                                 key={user.id}
                                 onClick={() => { setSelectedContact(user); setCurrentView('conversation'); }}
-                                className="flex items-center gap-3 p-3 px-4 hover:bg-[#202020] cursor-pointer transition-colors"
+                                className="flex items-center gap-3 p-3 px-4 hover:bg-[#202020] cursor-pointer transition-colors relative"
                             >
                                 <div className="relative shrink-0">
                                     <div className="w-10 h-10 rounded-full bg-[#2C2C2C] flex items-center justify-center text-lg border border-[#333]">
@@ -316,19 +403,24 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-center mb-0.5">
-                                        <h4 className="font-semibold text-gray-200 text-sm">{user.name}</h4>
+                                        <h4 className={`font-semibold text-sm ${unreadCount > 0 ? 'text-white' : 'text-gray-200'}`}>{user.name}</h4>
                                         {lastMsg && (
-                                            <span className="text-[10px] text-gray-500">
+                                            <span className={`text-[10px] ${unreadCount > 0 ? 'text-blue-400' : 'text-gray-500'}`}>
                                                 {new Date(lastMsg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                             </span>
                                         )}
                                     </div>
-                                    <p className={`text-xs truncate ${lastMsg ? 'text-gray-400' : 'text-gray-600 italic'}`}>
+                                    <p className={`text-xs truncate ${unreadCount > 0 ? 'text-gray-200 font-medium' : (lastMsg ? 'text-gray-400' : 'text-gray-600 italic')}`}>
                                         {lastMsg 
                                             ? (lastMsg.senderId === currentUser.username ? `Você: ${lastMsg.text}` : lastMsg.text)
                                             : 'Iniciar uma conversa'}
                                     </p>
                                 </div>
+                                {unreadCount > 0 && (
+                                    <div className="ml-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}

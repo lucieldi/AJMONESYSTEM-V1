@@ -21,6 +21,7 @@ export interface AppSettings {
   showSidebar: boolean;
   showBreadcrumbs: boolean;
   showGreeting: boolean;
+  theme: 'light' | 'dark';
 }
 
 export interface Attachment {
