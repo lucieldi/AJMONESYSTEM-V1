@@ -1,7 +1,7 @@
 
 import { User } from '../types';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = '/api';
 const LS_KEY = 'ajm_users_local_db';
 
 // Dados iniciais caso não exista nada local nem no backend

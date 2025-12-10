@@ -1,6 +1,6 @@
 import { Project } from '../types';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = '/api';
 const LS_KEY = 'ajm_projects_local_db';
 
 const getLocalProjects = (): Project[] => {

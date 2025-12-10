@@ -1,7 +1,7 @@
 
 import { ChatMessage } from '../types';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = '/api';
 const LS_KEY = 'ajm_global_chat_history';
 
 // Helper para fallback local se backend estiver offline
