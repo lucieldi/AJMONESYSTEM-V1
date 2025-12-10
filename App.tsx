@@ -1,49 +1,30 @@
-
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Menu, Search, Home, Plus, Settings, MoreHorizontal, 
-  FileText, Trello, GitMerge, ChevronRight, Clock, Trash2, Brain, 
-  Image as ImageIcon, Palette, Upload, Type, Archive, RotateCcw, ChevronDown, Smile, X, MoveVertical,
-  ListTodo, MessageSquare, LogOut, User as UserIcon, LayoutDashboard,
-  LifeBuoy, Monitor, Briefcase, TrendingUp, ShieldCheck
-} from 'lucide-react';
-import { Project, NavigationState, ViewType, KanbanColumn, IshikawaData, ScrumData, User, AppSettings, SupportTicket, ChatMessage } from './types';
+    User, Project, SupportTicket, AppSettings, ViewType, NavigationState, ChatMessage, 
+    KanbanColumn, IshikawaData, ScrumData 
+} from './types';
+import { userService } from './services/userService';
+import { projectService } from './services/projectService';
+import { chatService } from './services/chatService';
+import { fileService } from './services/fileService';
+import { generateKanbanBoard, generateIshikawaData, generateScrumBacklog } from './services/geminiService';
+
+import LoginScreen from './components/LoginScreen';
 import KanbanBoard from './components/KanbanBoard';
 import IshikawaDiagram from './components/IshikawaDiagram';
 import ScrumBoard from './components/ScrumBoard';
 import GlobalChat from './components/GlobalChat';
-import LoginScreen from './components/LoginScreen';
 import SettingsModal from './components/SettingsModal';
 import AdminDashboard from './components/AdminDashboard';
 import SupportHelpdesk from './components/SupportHelpdesk';
-import { generateKanbanBoard, generateIshikawaData, generateScrumBacklog } from './services/geminiService';
-import { userService } from './services/userService';
-import { projectService } from './services/projectService';
 
-// --- Constants ---
-
-const COVERS = [
-    'linear-gradient(to right, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
-    'linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%)',
-    'linear-gradient(to right, #43e97b 0%, #38f9d7 100%)',
-    'linear-gradient(120deg, #f6d365 0%, #fda085 100%)',
-    'linear-gradient(to right, #fa709a 0%, #fee140 100%)',
-    '#2C2C2C' // Neutral/Remove
-];
-
-const THEMES = [
-    '#191919', // Default Dark
-    '#2B2B2B', // Lighter Dark
-    '#0F172A', // Slate 900
-    '#312e81', // Indigo 900
-    '#3F2E3E', // Deep Purple
-];
-
-const EMOJI_LIST = [
-    '🚀', '📄', '✅', '🎨', '📅', '💡', '🔥', '✨', '🏆', '🎯', 
-    '📢', '💰', '📈', '🛒', '🔧', '⚙️', '🏠', '✈️', '🍔', '🎵',
-    '💻', '🔒', '📦', '🎁', '🎓', '💊', '⚽', '⭐', '❤️', '⚠️'
-];
+import { 
+    Search, Home, LayoutDashboard, Settings, MessageSquare, Plus, Trash2, ChevronDown, 
+    RotateCcw, Monitor, LogOut, ShieldCheck, Briefcase, User as UserIcon, ChevronRight, 
+    Clock, Trello, GitMerge, MoreHorizontal, ImageIcon, Upload, MoveVertical, Type, 
+    Palette, Sun, Moon, MousePointer2, AlertTriangle, Check, Send, X, Smile, Camera, 
+    Eye, Layout, FileText, List, Layers, Trophy 
+} from 'lucide-react';
 
 const DEFAULT_SETTINGS: AppSettings = {
     showSidebar: true,
@@ -53,14 +34,44 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'dark'
 };
 
-// --- Helpers ---
+const EMOJI_LIST = [
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+    '🥳', '😏', '😒', '😞', '😔', 'ww', '😕', '🙁', '☹️', '😣',
+    '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+    '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+    '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+    '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', 'hk',
+    '🤐', '🥴', '🤢', '🤮', '😷', '🤒', '🤕', '👽', '👻', '🤖', 
+    '💩', '💤', '⭐', '🔥', '👍', '👎'
+];
+
+const COVERS = [
+    '#2C2C2C', 
+    'linear-gradient(to right, #ff7e5f, #feb47b)',
+    'linear-gradient(to right, #6a11cb, #2575fc)',
+    'linear-gradient(to right, #43e97b, #38f9d7)',
+    'linear-gradient(to right, #fa709a, #fee140)',
+    'linear-gradient(to right, #00c6ff, #0072ff)'
+];
+
+const THEMES = [
+    '#191919', 
+    '#ffffff', 
+    '#2d2b55', 
+    '#1e1e1e', 
+    '#fafafa'
+];
+
 const getCoverUrl = (cover?: string) => {
     if (!cover) return null;
-    const match = cover.match(/url\(['"]?(.*?)['"]?\)/);
-    return match ? match[1] : null;
+    if (cover.startsWith('url(')) {
+        const matches = cover.match(/url\(["']?(.*?)["']?\)/);
+        return matches ? matches[1] : null;
+    }
+    return null;
 };
-
-// --- Components ---
 
 interface RepositionModalProps {
     image: string;
@@ -122,28 +133,40 @@ const RepositionModal: React.FC<RepositionModalProps> = ({ image, onSave, onCanc
                     </div>
                 </div>
                 <div 
-                    className="h-64 w-full relative overflow-hidden cursor-ns-resize group select-none" 
+                    className="h-64 w-full relative overflow-hidden cursor-ns-resize group select-none bg-[#202020]" 
                     onMouseDown={handleMouseDown}
                 >
+                    {/* Preview Double Layer Effect */}
                     <div 
-                        className="w-full h-full transition-none will-change-[background-position]"
+                        className="absolute inset-0 opacity-40 blur-xl scale-110"
                         style={{ 
                             backgroundImage: `url(${image})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: `center ${pos}%`
+                            backgroundSize: 'cover', 
+                            backgroundPosition: 'center',
                         }}
                     />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div 
+                        className="absolute inset-0 transition-none will-change-[background-position]"
+                        style={{ 
+                            backgroundImage: `url(${image})`,
+                            backgroundSize: 'contain', 
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat'
+                        }}
+                    />
+                    
+                    {/* Controls Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                         <div className="bg-black/40 backdrop-blur-md text-white text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full border border-white/20">
-                            Arraste para Reposicionar
+                            Arraste para Reposicionar (Pré-visualização)
                         </div>
                     </div>
                     {/* Guides */}
-                    <div className="absolute top-0 left-0 right-0 h-px bg-white/10"></div>
-                    <div className="absolute bottom-0 left-0 right-0 h-px bg-white/10"></div>
+                    <div className="absolute top-0 left-0 right-0 h-px bg-white/10 z-10"></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-px bg-white/10 z-10"></div>
                 </div>
                 <div className="p-3 bg-[#191919] text-center text-xs text-notion-muted">
-                    Arraste a imagem para cima ou para baixo para ajustar como ela aparece.
+                    Sua imagem será exibida inteira (proporcional) com um fundo desfocado para preencher as laterais.
                 </div>
             </div>
         </div>
@@ -192,7 +215,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   // Data State
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); 
 
@@ -200,7 +223,6 @@ function App() {
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
       try {
           const saved = localStorage.getItem('ajm_app_settings');
-          // Merge saved settings with defaults to ensure new properties (like sidebarHoverBehavior) are populated
           return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
       } catch {
           return DEFAULT_SETTINGS;
@@ -211,14 +233,14 @@ function App() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [viewType, setViewType] = useState<ViewType>(ViewType.DOCUMENT);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isCompletedOpen, setIsCompletedOpen] = useState(false); // Sidebar toggle
+  const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
   
   // Menus & Modals
   const [showStyleMenu, setShowStyleMenu] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [pendingUpload, setPendingUpload] = useState<string | null>(null); // For repositioning flow
-  const [pickerTarget, setPickerTarget] = useState<string | null>(null); // ID of project getting new icon
+  const [pendingUpload, setPendingUpload] = useState<string | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<string | null>(null);
   
   // Chat
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -232,8 +254,6 @@ function App() {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  // --- PERMISSION LOGIC ---
-  // Everyone sees all projects (Collaboration mode), but only Admins can create.
   const visibleProjects = useMemo(() => {
       if (!currentUser) return [];
       return projects;
@@ -244,14 +264,11 @@ function App() {
   
   const currentProject = projects.find(p => p.id === currentProjectId);
 
-  // --- Init Data from Backend ---
   useEffect(() => {
-    // Load Users
     userService.getAllUsers().then(fetchedUsers => {
         setUsers(fetchedUsers);
     });
 
-    // Load Projects
     projectService.getProjects().then(fetchedProjects => {
         setProjects(fetchedProjects);
     });
@@ -262,15 +279,12 @@ function App() {
     }
   }, []);
 
-  // Persist settings & Apply Theme
   useEffect(() => {
     localStorage.setItem('ajm_app_settings', JSON.stringify(appSettings));
     
-    // Apply Theme
     const root = document.documentElement;
     if (appSettings.theme === 'light') {
         root.classList.remove('dark');
-        // Force background for body
         document.body.style.backgroundColor = '#f3f4f6';
         document.body.style.color = '#1f2937';
     } else {
@@ -281,7 +295,6 @@ function App() {
 
   }, [appSettings]);
 
-  // Persist tickets (Simulated persistence)
   useEffect(() => {
       localStorage.setItem('ajm_support_tickets', JSON.stringify(supportTickets));
   }, [supportTickets]);
@@ -291,7 +304,6 @@ function App() {
           if (styleMenuRef.current && !styleMenuRef.current.contains(event.target as Node)) {
               setShowStyleMenu(false);
           }
-          // Close emoji picker if clicking elsewhere
           const target = event.target as HTMLElement;
           if (!target.closest('.emoji-trigger') && !target.closest('.emoji-picker-container')) {
               setPickerTarget(null);
@@ -303,6 +315,18 @@ function App() {
 
   // --- Handlers ---
 
+  const handleNavClick = (state: NavigationState, projectId?: string) => {
+      if (projectId) {
+          setCurrentProjectId(projectId);
+      }
+      setNavState(state);
+      
+      // Only auto-close sidebar on mobile devices (< 768px)
+      if (window.innerWidth < 768) {
+          setIsSidebarOpen(false);
+      }
+  };
+
   const handleLogin = (user: User) => {
       setCurrentUser(user);
   };
@@ -313,12 +337,10 @@ function App() {
       setIsSettingsOpen(false);
   };
 
-  // --- User Handlers ---
   const handleAddUser = async (newUser: User & { password?: string }) => {
       try {
         const created = await userService.createUser(newUser);
         setUsers(prev => {
-            // Prevent duplicates (Defensive check)
             if (prev.some(u => u.id === created.id || u.username === created.username)) {
                 return prev;
             }
@@ -344,11 +366,9 @@ function App() {
       setUsers(prev => prev.filter(u => u.id !== userId));
   };
 
-  // --- Project Handlers (With Persistence) ---
-
   const saveProjectsChanges = (newProjects: Project[]) => {
       setProjects(newProjects);
-      projectService.saveProjects(newProjects); // Save to Backend/Local
+      projectService.saveProjects(newProjects); 
   };
 
   const handleCreateProject = () => {
@@ -359,7 +379,7 @@ function App() {
       icon: '📄',
       updatedAt: new Date(),
       status: 'active',
-      createdBy: currentUser.id, // Assign Ownership
+      createdBy: currentUser.id, 
       content: '',
       kanbanData: [
         { id: 'todo', title: 'A Fazer', tasks: [] },
@@ -378,7 +398,6 @@ function App() {
     setViewType(ViewType.DOCUMENT);
   };
 
-  // Simplified to only create Campaign
   const handleCreateCampaign = () => {
       if (!currentUser) return;
       
@@ -512,7 +531,6 @@ function App() {
       }
   };
 
-  // --- Ticket Handlers ---
   const handleAddTicket = (ticket: SupportTicket) => {
       setSupportTickets(prev => [ticket, ...prev]);
       setToast({ message: 'Chamado criado com sucesso!' });
@@ -523,15 +541,8 @@ function App() {
       setSupportTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status } : t));
   };
 
-  // --- Chat Notifications ---
   const handleChatNotification = (msg: ChatMessage) => {
       if (!currentUser) return;
-
-      // Only increment unread if chat is closed
-      if (!isChatOpen) {
-          // Note: GlobalChat calculates total unreads on sync, but for immediate feedback:
-          // We rely on GlobalChat's polling/sync to update the total count via setTotalUnread prop
-      }
       
       const isPrivate = msg.recipientId === currentUser.username;
       
@@ -552,9 +563,6 @@ function App() {
           }
       }
   };
-
-
-  // --- AI Handlers ---
 
   const handleGenerateKanban = async () => {
     if (!currentProject) return;
@@ -622,33 +630,30 @@ function App() {
           <Search size={16} /> Pesquisar
         </button>
         <button 
-          onClick={() => { setNavState('HOME'); setIsSidebarOpen(false); }}
+          onClick={() => handleNavClick('HOME')}
           className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'HOME' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
         >
           <Home size={16} /> Início
         </button>
         
-        {/* Admin Dashboard Link */}
         {isAdmin && (
             <button 
-                onClick={() => { setNavState('ADMIN_DASHBOARD'); setIsSidebarOpen(false); }}
+                onClick={() => handleNavClick('ADMIN_DASHBOARD')}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'ADMIN_DASHBOARD' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
             >
                 <LayoutDashboard size={16} className="text-blue-400" /> Painel Admin
             </button>
         )}
 
-        {/* Settings Toggle in Sidebar */}
         <button 
-            onClick={() => { setIsSettingsOpen(true); setIsSidebarOpen(false); }}
+            onClick={() => { setIsSettingsOpen(true); if(window.innerWidth < 768) setIsSidebarOpen(false); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-notion-muted hover:bg-notion-hover hover:text-notion-text rounded-md text-sm"
         >
             <Settings size={16} /> Configurações
         </button>
         
-        {/* Chat Toggle in Sidebar */}
         <button 
-            onClick={() => { setIsChatOpen(true); setIsSidebarOpen(false); }}
+            onClick={() => { setIsChatOpen(true); if(window.innerWidth < 768) setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm relative ${isChatOpen ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
         >
           <MessageSquare size={16} /> Chat da Equipe
@@ -661,7 +666,6 @@ function App() {
       </div>
 
       <div className="mt-6 px-4 flex-1 overflow-y-auto">
-        {/* ACTIVE PROJECTS */}
         <div className="text-xs font-semibold text-notion-muted mb-2 flex justify-between items-center">
             <span>{isAdmin ? 'TODOS OS PROJETOS' : 'MEUS PROJETOS'}</span>
             <Plus size={14} className="cursor-pointer hover:text-white" onClick={handleCreateProject}/>
@@ -670,7 +674,7 @@ function App() {
           {activeProjects.map(p => (
             <div 
               key={p.id}
-              onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); setIsSidebarOpen(false); }}
+              onClick={() => handleNavClick('PROJECT', p.id)}
               className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer ${currentProjectId === p.id && navState === 'PROJECT' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
             >
               <span className="text-base">{p.icon}</span>
@@ -693,7 +697,6 @@ function App() {
           ))}
         </div>
 
-        {/* COMPLETED PROJECTS */}
         {completedProjects.length > 0 && (
             <div className="mb-6">
                  <div 
@@ -708,7 +711,7 @@ function App() {
                         {completedProjects.map(p => (
                             <div 
                             key={p.id}
-                            onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); setIsSidebarOpen(false); }}
+                            onClick={() => handleNavClick('PROJECT', p.id)}
                             className={`group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer opacity-70 hover:opacity-100 ${currentProjectId === p.id && navState === 'PROJECT' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
                             >
                             <span className="text-base grayscale">{p.icon}</span>
@@ -728,17 +731,15 @@ function App() {
         )}
       </div>
 
-      {/* Helpdesk Link - Pinned to bottom before profile */}
       <div className="px-2 py-2 border-t border-[#333]/50">
         <button 
-            onClick={() => { setNavState('IT_HELPDESK'); setIsSidebarOpen(false); }}
+            onClick={() => handleNavClick('IT_HELPDESK')}
             className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${navState === 'IT_HELPDESK' ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
         >
           <Monitor size={16} className={navState === 'IT_HELPDESK' ? "text-purple-400" : ""} /> Suporte / Helpdesk
         </button>
       </div>
 
-      {/* User Profile / Logout */}
       <div className="p-4 border-t border-[#333] bg-[#1c1c1c]">
           <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -766,7 +767,6 @@ function App() {
 
   const renderHome = () => (
     <div className="relative min-h-full w-full">
-      {/* Background decoration for Home - Only applied here */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-[-200px] left-[-200px] w-[600px] h-[600px] bg-green-600/10 rounded-full blur-[120px]"></div>
           <div className="absolute bottom-[-200px] right-[-200px] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px]"></div>
@@ -782,14 +782,12 @@ function App() {
           </div>
       )}
 
-      {/* --- ADMIN QUICK ACTIONS ROW --- */}
       {isAdmin && (
           <div className="mb-12">
             <h2 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <ShieldCheck size={14}/> Atalhos Administrativos
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                 {/* Create Campaign */}
                  <div onClick={handleCreateCampaign} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
                      <div className="flex items-center justify-between mb-3">
                          <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
@@ -801,7 +799,6 @@ function App() {
                      <p className="text-xs text-gray-500 dark:text-notion-muted mt-1">Template de Marketing</p>
                  </div>
 
-                 {/* Manage Users */}
                  <div onClick={() => { setIsSettingsOpen(true); }} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-orange-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
                      <div className="flex items-center justify-between mb-3">
                          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg">
@@ -813,8 +810,7 @@ function App() {
                      <p className="text-xs text-gray-500 dark:text-notion-muted mt-1">Controle de Usuários</p>
                  </div>
 
-                 {/* Admin Dash */}
-                 <div onClick={() => setNavState('ADMIN_DASHBOARD')} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
+                 <div onClick={() => handleNavClick('ADMIN_DASHBOARD')} className="bg-white dark:bg-[#202020] hover:bg-gray-50 dark:hover:bg-[#2C2C2C] border border-gray-200 dark:border-[#333] hover:border-blue-500/50 p-4 rounded-lg cursor-pointer transition-all group shadow-sm">
                      <div className="flex items-center justify-between mb-3">
                          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
                              <LayoutDashboard size={20}/>
@@ -828,36 +824,46 @@ function App() {
           </div>
       )}
 
-      {/* --- STANDARD PROJECT LIST --- */}
       <h2 className="text-sm font-semibold text-gray-500 dark:text-notion-muted uppercase mb-4">
           {isAdmin ? 'Projetos Recentes (Visão Global)' : 'Projetos Recentes'}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* Recently Visited Cards */}
         {activeProjects.slice(0, 4).map(p => (
            <div 
              key={p.id} 
-             onClick={() => { setCurrentProjectId(p.id); setNavState('PROJECT'); }}
+             onClick={() => handleNavClick('PROJECT', p.id)}
              className="bg-white dark:bg-notion-card rounded-lg hover:bg-gray-50 dark:hover:bg-notion-hover cursor-pointer group transition-all overflow-hidden flex flex-col h-32 relative shadow-sm dark:shadow-lg dark:shadow-black/20 border border-gray-200 dark:border-transparent"
            >
-             {/* Card Cover */}
-             <div 
-                className="h-12 w-full shrink-0 relative overflow-hidden"
-                style={{ 
-                    background: p.cover || '#333', 
-                    backgroundSize: 'cover', 
-                    backgroundPosition: `center ${p.coverPositionY ?? 50}%` 
-                }}
-             >
+             <div className="h-12 w-full shrink-0 relative overflow-hidden bg-[#202020]">
+                 {/* DOUBLE LAYER BACKGROUND FOR CARDS */}
+                 {p.cover && (
+                     <div 
+                        className="absolute inset-0 opacity-40 blur-md scale-110"
+                        style={{ 
+                            background: p.cover, 
+                            backgroundSize: 'cover', 
+                            backgroundPosition: 'center' 
+                        }}
+                     />
+                 )}
+                 <div 
+                    className="absolute inset-0 z-10"
+                    style={{ 
+                        background: p.cover || '#333', 
+                        backgroundSize: p.cover?.includes('url') ? 'contain' : 'cover', 
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'center' 
+                    }}
+                 />
                  {p.coverText && (
-                     <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
+                     <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px] z-20">
                          <span className="text-white text-[10px] font-bold uppercase tracking-wide truncate max-w-[90%]">{p.coverText}</span>
                      </div>
                  )}
              </div>
              <div className="p-4 pt-6 relative flex-1 flex flex-col justify-end">
                 <div 
-                    className="text-2xl absolute -top-5 left-3 hover:bg-[#333] rounded p-1 transition-colors z-10 emoji-trigger relative"
+                    className="text-2xl absolute -top-5 left-3 hover:bg-[#333] rounded p-1 transition-colors z-30 emoji-trigger relative"
                     onClick={(e) => {
                         e.stopPropagation();
                         setPickerTarget(pickerTarget === p.id ? null : p.id);
@@ -883,7 +889,6 @@ function App() {
              </div>
            </div>
         ))}
-        {/* New Project Card - For Everyone */}
         <div 
             onClick={handleCreateProject}
             className="bg-white dark:bg-notion-card p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-notion-hover cursor-pointer group flex flex-col items-center justify-center text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white h-32 border border-dashed border-gray-300 dark:border-[#444] hover:border-gray-500"
@@ -928,11 +933,10 @@ function App() {
         className="flex flex-col h-full overflow-hidden transition-colors duration-500"
         style={{ backgroundColor: currentProject.theme || (appSettings.theme === 'light' ? '#ffffff' : '#191919') }}
       >
-        {/* Project Header (Top Bar) */}
         {appSettings.showBreadcrumbs && (
             <div className={`h-12 flex items-center justify-between px-4 sticky top-0 z-20 bg-inherit/90 backdrop-blur-sm ${!isSidebarOpen && appSettings.showSidebar ? 'pl-14' : ''}`}>
             <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-notion-muted text-sm cursor-pointer hover:underline" onClick={() => setNavState('HOME')}>Início</span>
+                <span className="text-gray-500 dark:text-notion-muted text-sm cursor-pointer hover:underline" onClick={() => handleNavClick('HOME')}>Início</span>
                 <span className="text-gray-500 dark:text-notion-muted">/</span>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-200">
                     <span className="emoji-trigger relative" onClick={(e) => {
@@ -967,7 +971,6 @@ function App() {
             <div className="flex items-center gap-3 relative">
                 <span className="text-xs text-gray-500 dark:text-notion-muted">Editado {currentProject.updatedAt.toLocaleTimeString()}</span>
                 
-                {/* Customization Menu - Accessible to all */}
                 <div className="relative" ref={styleMenuRef}>
                         <button 
                             onClick={() => setShowStyleMenu(!showStyleMenu)}
@@ -977,7 +980,6 @@ function App() {
                         </button>
                         {showStyleMenu && (
                             <div className="absolute right-0 top-8 w-72 bg-white dark:bg-[#2C2C2C] border border-gray-200 dark:border-[#444] rounded-lg shadow-xl z-50 p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-4">
-                                {/* Cover Image Section */}
                                 <div>
                                     <div className="text-xs font-semibold text-gray-500 dark:text-notion-muted mb-2 uppercase flex items-center gap-2">
                                         <ImageIcon size={12}/> Imagem de Capa
@@ -999,7 +1001,6 @@ function App() {
                                     >
                                         <Upload size={12}/> Carregar Personalizada
                                     </button>
-                                    {/* Only show Reposition if it's an image (URL) */}
                                     {getCoverUrl(currentProject.cover) && (
                                         <button 
                                             onClick={() => {
@@ -1023,7 +1024,6 @@ function App() {
                                     />
                                 </div>
 
-                                {/* Cover Text Section */}
                                 <div>
                                     <div className="text-xs font-semibold text-gray-500 dark:text-notion-muted mb-2 uppercase flex items-center gap-2">
                                         <Type size={12}/> Texto do Banner
@@ -1037,7 +1037,6 @@ function App() {
                                     />
                                 </div>
 
-                                {/* Theme Section */}
                                 <div>
                                     <div className="text-xs font-semibold text-gray-500 dark:text-notion-muted mb-2 uppercase flex items-center gap-2">
                                         <Palette size={12}/> Tema de Fundo
@@ -1061,56 +1060,72 @@ function App() {
             </div>
         )}
 
-        {/* Project Cover Banner */}
-        <div className="relative group shrink-0">
-            {currentProject.cover ? (
+        <div className="relative group shrink-0 h-44 w-full overflow-hidden bg-[#202020]">
+            {/* BACKGROUND LAYER: BLURRED FILL */}
+            {currentProject.cover && (
                 <div 
-                    className="h-44 w-full transition-all relative overflow-hidden"
+                    className="absolute inset-0 w-full h-full opacity-30 blur-xl scale-110 transition-all duration-700 pointer-events-none"
                     style={{ 
                         background: currentProject.cover,
-                        backgroundSize: 'cover',
-                        backgroundPosition: `center ${currentProject.coverPositionY ?? 50}%` 
+                        backgroundSize: 'cover', 
+                        backgroundPosition: 'center' 
                     }}
-                >
-                    {/* Optional Text Overlay */}
-                    {currentProject.coverText && (
-                        <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/20 backdrop-blur-[1px]">
-                            <h2 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-lg text-center px-4">
-                                {currentProject.coverText}
-                            </h2>
-                        </div>
-                    )}
-                    
-                    {/* Controls accessible to everyone */}
-                    <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                            {getCoverUrl(currentProject.cover) && (
-                            <button 
-                                onClick={(e) => {
-                                        e.stopPropagation();
-                                        const url = getCoverUrl(currentProject.cover);
-                                        if(url) setPendingUpload(url);
-                                }}
-                                className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
-                            >
-                                <MoveVertical size={14} /> Reposicionar
-                            </button>
-                            )}
-                            <button 
-                            onClick={(e) => { e.stopPropagation(); setShowStyleMenu(true); }}
-                            className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
-                            >
-                                <ImageIcon size={14} /> Alterar Capa
-                            </button>
+                />
+            )}
+
+            {/* FOREGROUND LAYER: PROPORTIONAL IMAGE */}
+            <div 
+                className="absolute inset-0 w-full h-full z-10 transition-all duration-500"
+                style={{ 
+                    background: currentProject.cover,
+                    // If it's an image URL, use CONTAIN to show full logo. If it's a gradient, use COVER to fill.
+                    backgroundSize: currentProject.cover?.includes('url') ? 'contain' : 'cover', 
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center' 
+                }}
+            >
+                {currentProject.coverText && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]">
+                        <h2 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-lg text-center px-4">
+                            {currentProject.coverText}
+                        </h2>
                     </div>
-                </div>
-            ) : (
-                <div className="h-12 w-full group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-colors flex items-center px-12 text-sm text-gray-400 dark:text-notion-muted opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => setShowStyleMenu(true)}>
-                    <ImageIcon size={14} className="mr-2"/> Adicionar Capa
+                )}
+            </div>
+            
+            {/* Controls */}
+            <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    {getCoverUrl(currentProject.cover) && (
+                    <button 
+                        onClick={(e) => {
+                                e.stopPropagation();
+                                const url = getCoverUrl(currentProject.cover);
+                                if(url) setPendingUpload(url);
+                        }}
+                        className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
+                    >
+                        <MoveVertical size={14} /> Reposicionar
+                    </button>
+                    )}
+                    <button 
+                    onClick={(e) => { e.stopPropagation(); setShowStyleMenu(true); }}
+                    className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-md backdrop-blur-md border border-white/10 flex items-center gap-2 text-xs font-medium shadow-sm"
+                    >
+                        <ImageIcon size={14} /> Alterar Capa
+                    </button>
+            </div>
+            
+            {/* Empty State Overlay */}
+            {!currentProject.cover && (
+                <div className="absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-white/5 transition-colors" onClick={() => setShowStyleMenu(true)}>
+                     <div className="flex items-center gap-2 text-notion-muted">
+                        <ImageIcon size={20}/>
+                        <span className="text-sm">Adicionar Capa</span>
+                     </div>
                 </div>
             )}
         </div>
 
-        {/* View Switcher & Title */}
         <div className="px-12 pb-4 flex flex-col h-full overflow-hidden">
             <div className="group relative mb-6 mt-8 z-30">
                  <input 
@@ -1121,108 +1136,78 @@ function App() {
                  />
             </div>
 
-            <div className="flex items-center gap-4 border-b border-gray-200 dark:border-white/10 mb-6 shrink-0 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-6 border-b border-[#333] mb-6">
                 <button 
                     onClick={() => setViewType(ViewType.DOCUMENT)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.DOCUMENT ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
+                    className={`pb-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${viewType === ViewType.DOCUMENT ? 'border-blue-500 text-white' : 'border-transparent text-notion-muted hover:text-gray-300'}`}
                 >
                     <FileText size={16}/> Documento
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.KANBAN)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.KANBAN ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
+                    className={`pb-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${viewType === ViewType.KANBAN ? 'border-blue-500 text-white' : 'border-transparent text-notion-muted hover:text-gray-300'}`}
                 >
-                    <Trello size={16}/> Kanban
+                    <Trello size={16}/> Quadro Kanban
                 </button>
-                <button 
+                 <button 
                     onClick={() => setViewType(ViewType.ISHIKAWA)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.ISHIKAWA ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
+                    className={`pb-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${viewType === ViewType.ISHIKAWA ? 'border-blue-500 text-white' : 'border-transparent text-notion-muted hover:text-gray-300'}`}
                 >
-                    <GitMerge size={16} className="rotate-90"/> Ishikawa
+                    <GitMerge size={16} className="rotate-90"/> Diagrama Ishikawa
                 </button>
                 <button 
                     onClick={() => setViewType(ViewType.SCRUM)}
-                    className={`pb-2 text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${viewType === ViewType.SCRUM ? 'border-b-2 border-black dark:border-white text-black dark:text-white' : 'text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white'}`}
+                    className={`pb-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${viewType === ViewType.SCRUM ? 'border-blue-500 text-white' : 'border-transparent text-notion-muted hover:text-gray-300'}`}
                 >
-                    <ListTodo size={16}/> Scrum
+                    <Layers size={16}/> Scrum
                 </button>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-hidden min-h-0">
+            <div className="flex-1 overflow-hidden pb-8 relative">
                 {viewType === ViewType.DOCUMENT && (
                     <textarea 
-                        className="w-full h-full bg-transparent resize-none outline-none text-gray-800 dark:text-gray-300 leading-relaxed p-4"
-                        placeholder="Digite '/' para comandos..."
+                        className="w-full h-full bg-transparent border-none outline-none resize-none text-gray-300 leading-relaxed"
                         value={currentProject.content}
-                        onChange={(e) => updateProject(currentProject.id, { content: e.target.value })}
+                        onChange={e => updateProject(currentProject.id, { content: e.target.value })}
+                        placeholder="Comece a escrever..."
                     />
                 )}
-
                 {viewType === ViewType.KANBAN && (
-                    <div className="h-full flex flex-col">
-                        <div className="flex justify-between items-center mb-4 shrink-0 gap-2">
-                            <p className="text-sm text-gray-500 dark:text-notion-muted truncate">Arraste os cartões para atualizar o status.</p>
-                            <button 
-                                onClick={handleGenerateKanban}
-                                disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-purple-100 dark:bg-purple-600/20 text-purple-600 dark:text-purple-300 px-3 py-1.5 rounded text-xs hover:bg-purple-200 dark:hover:bg-purple-600/30 transition-colors border border-purple-200 dark:border-purple-500/30 whitespace-nowrap"
-                            >
-                                <Brain size={14} />
-                                {isAiLoading ? 'Gerando...' : 'Gerar Colunas Automaticamente'}
+                    <>
+                        <div className="mb-2 flex justify-end">
+                            <button onClick={handleGenerateKanban} disabled={isAiLoading} className="text-xs flex items-center gap-1 bg-purple-600/20 text-purple-400 px-2 py-1 rounded hover:bg-purple-600/30 transition-colors">
+                                {isAiLoading ? 'Gerando...' : '✨ Gerar com IA'}
                             </button>
                         </div>
-                        <div className="flex-1 overflow-hidden">
-                             <KanbanBoard 
-                                data={currentProject.kanbanData} 
-                                onChange={(newData) => updateProject(currentProject.id, { kanbanData: newData })}
-                                currentUser={currentUser}
-                            />
-                        </div>
-                    </div>
+                        <KanbanBoard 
+                            data={currentProject.kanbanData} 
+                            onChange={newData => updateProject(currentProject.id, { kanbanData: newData })}
+                            currentUser={currentUser}
+                        />
+                    </>
                 )}
-
                 {viewType === ViewType.ISHIKAWA && (
-                    <div className="h-full flex flex-col">
-                         <div className="flex justify-between items-center mb-4 shrink-0">
-                             <div className="text-sm text-gray-500 dark:text-notion-muted truncate max-w-[200px] md:max-w-none">
-                                 Efeito: <span className="text-black dark:text-white font-semibold">{currentProject.ishikawaData.effect}</span>
-                             </div>
-                             <button 
-                                onClick={handleGenerateIshikawa}
-                                disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-300 px-3 py-1.5 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-600/30 transition-colors border border-blue-200 dark:border-blue-500/30 whitespace-nowrap"
-                            >
-                                <Brain size={14} />
-                                {isAiLoading ? 'Analisando...' : 'Gerar com IA'}
+                     <>
+                        <div className="mb-2 flex justify-end">
+                            <button onClick={handleGenerateIshikawa} disabled={isAiLoading} className="text-xs flex items-center gap-1 bg-purple-600/20 text-purple-400 px-2 py-1 rounded hover:bg-purple-600/30 transition-colors">
+                                {isAiLoading ? 'Gerando...' : '✨ Gerar com IA'}
                             </button>
                         </div>
-                        <div className="flex-1 overflow-hidden">
-                             <IshikawaDiagram data={currentProject.ishikawaData} />
-                        </div>
-                    </div>
+                        <IshikawaDiagram data={currentProject.ishikawaData} />
+                     </>
                 )}
-                
                 {viewType === ViewType.SCRUM && (
-                     <div className="h-full flex flex-col">
-                        <div className="flex justify-between items-center mb-4 shrink-0 gap-2">
-                            <p className="text-sm text-gray-500 dark:text-notion-muted truncate">Planeje sprints movendo itens do backlog.</p>
-                            <button 
-                                onClick={handleGenerateBacklog}
-                                disabled={isAiLoading}
-                                className="flex items-center gap-2 bg-green-100 dark:bg-green-600/20 text-green-600 dark:text-green-300 px-3 py-1.5 rounded text-xs hover:bg-green-200 dark:hover:bg-green-600/30 transition-colors border border-green-200 dark:border-green-500/30 whitespace-nowrap"
-                            >
-                                <Brain size={14} />
-                                {isAiLoading ? 'Gerando...' : 'Gerar Histórias de Usuário'}
+                     <>
+                        <div className="mb-2 flex justify-end">
+                            <button onClick={handleGenerateBacklog} disabled={isAiLoading} className="text-xs flex items-center gap-1 bg-purple-600/20 text-purple-400 px-2 py-1 rounded hover:bg-purple-600/30 transition-colors">
+                                {isAiLoading ? 'Gerando...' : '✨ Gerar Backlog com IA'}
                             </button>
                         </div>
-                        <div className="flex-1 overflow-hidden">
-                             <ScrumBoard 
-                                data={currentProject.scrumData || { backlog: [], sprints: [] }}
-                                onChange={(newData) => updateProject(currentProject.id, { scrumData: newData })}
-                            />
-                        </div>
-                    </div>
+                        <ScrumBoard 
+                            data={currentProject.scrumData} 
+                            onChange={newData => updateProject(currentProject.id, { scrumData: newData })}
+                        />
+                     </>
                 )}
             </div>
         </div>
@@ -1231,134 +1216,78 @@ function App() {
   };
 
   if (!currentUser) {
-      return (
-        <>
-            {/* Backdrop for Mobile Sidebar */}
-            {appSettings.showSidebar && isSidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-black/50 z-30 md:hidden"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-            <LoginScreen onLogin={handleLogin} users={users} />
-        </>
-      );
+      return <LoginScreen onLogin={handleLogin} users={users} />;
   }
 
   return (
-    <div className={`flex h-screen font-sans selection:bg-[#2383E2] selection:text-white overflow-hidden transition-colors duration-300 ${appSettings.theme === 'light' ? 'bg-[#f3f4f6] text-[#1f2937]' : 'bg-[#191919] text-[#D4D4D4]'}`}>
-      
-      {/* Mobile Sidebar Backdrop */}
-      {appSettings.showSidebar && isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-      )}
-
-      {/* Mobile Toggle */}
-      {!isSidebarOpen && appSettings.showSidebar && (
-          <div 
-            className="absolute top-4 left-4 z-50 p-2 -m-2" 
-            onMouseEnter={() => {
-                if(appSettings.sidebarHoverBehavior) setIsSidebarOpen(true);
-            }}
-          >
-             <Menu className="cursor-pointer text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white" onClick={() => setIsSidebarOpen(true)}/>
-          </div>
-      )}
-
-      {/* Floating Toggle if Sidebar is completely disabled via settings */}
-      {!appSettings.showSidebar && (
-          <div className="absolute top-4 left-4 z-50">
-              <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-black/50 hover:bg-black/80 rounded-full text-white/50 hover:text-white" title="Abrir Configurações">
-                  <Settings size={20}/>
-              </button>
-          </div>
-      )}
-
-      {renderSidebar()}
-      
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-          {/* Main Scroller */}
-          <div className="flex-1 overflow-y-auto h-full">
-             {navState === 'HOME' && renderHome()}
-             {navState === 'PROJECT' && renderProject()}
-             {navState === 'ADMIN_DASHBOARD' && (
-                 <AdminDashboard 
-                    projects={projects} 
-                    users={users} 
-                    onNavigateToProject={(id) => { setCurrentProjectId(id); setNavState('PROJECT'); }}
-                 />
-             )}
-             {navState === 'IT_HELPDESK' && (
-                 <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto">
-                    <SupportHelpdesk 
-                        currentUser={currentUser}
-                        tickets={supportTickets}
-                        onAddTicket={handleAddTicket}
-                        onUpdateTicketStatus={handleUpdateTicketStatus}
-                    />
+    <div className="flex h-screen w-full bg-[#191919] text-gray-200 font-sans overflow-hidden">
+        {renderSidebar()}
+        
+        <div className="flex-1 flex flex-col min-w-0 relative">
+             {(!appSettings.showSidebar || !isSidebarOpen) && (
+                 <div className="absolute top-4 left-4 z-50">
+                     <button 
+                        onClick={() => { setIsSidebarOpen(true); setAppSettings({...appSettings, showSidebar: true}); }} 
+                        className="p-2 bg-[#2C2C2C] border border-[#333] rounded-md shadow-lg text-gray-400 hover:text-white"
+                     >
+                         <List size={20}/>
+                     </button>
                  </div>
              )}
-          </div>
 
-          {/* Toast Notification */}
-          {toast && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-black px-4 py-3 rounded-md shadow-2xl flex items-center gap-4 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300 min-w-[300px] justify-between border border-gray-200">
-                  <span className="text-sm font-medium">{toast.message}</span>
-                  <div className="flex items-center gap-3">
-                      {toast.onUndo && (
-                          <button 
-                            onClick={() => { toast.onUndo?.(); setToast(null); }}
-                            className="text-sm font-bold text-blue-600 hover:underline"
-                          >
-                              Desfazer
-                          </button>
-                      )}
-                      <button onClick={() => setToast(null)} className="text-gray-400 hover:text-black transition-colors">
-                          <X size={16}/>
-                      </button>
-                  </div>
-              </div>
-          )}
-      </div>
+             {navState === 'HOME' && renderHome()}
+             {navState === 'PROJECT' && renderProject()}
+             {navState === 'ADMIN_DASHBOARD' && isAdmin && (
+                 <AdminDashboard projects={projects} users={users} onNavigateToProject={(pid) => { setCurrentProjectId(pid); setNavState('PROJECT'); }} />
+             )}
+             {navState === 'IT_HELPDESK' && (
+                 <div className="p-8 h-full overflow-y-auto">
+                     <SupportHelpdesk currentUser={currentUser} tickets={supportTickets} onAddTicket={handleAddTicket} onUpdateTicketStatus={handleUpdateTicketStatus} />
+                 </div>
+             )}
+        </div>
 
-      {/* Global Chat Overlay */}
-      {currentUser && (
         <GlobalChat 
             isOpen={isChatOpen} 
             onClose={() => setIsChatOpen(false)} 
-            onNewMessage={handleChatNotification}
             currentUser={currentUser}
             users={users}
+            onNewMessage={handleChatNotification}
             setTotalUnread={setUnreadMessages}
         />
-      )}
 
-      {/* Settings Modal (User Management) */}
-      <SettingsModal 
-         isOpen={isSettingsOpen} 
-         onClose={() => setIsSettingsOpen(false)}
-         users={users}
-         onAddUser={handleAddUser}
-         onUpdateUser={handleUpdateUser}
-         onDeleteUser={handleDeleteUser}
-         currentUserId={currentUser.id}
-         currentUser={currentUser}
-         appSettings={appSettings}
-         setAppSettings={setAppSettings}
-         onResetSettings={handleResetSettings}
-      />
+        <SettingsModal 
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            users={users}
+            onAddUser={handleAddUser}
+            onUpdateUser={handleUpdateUser}
+            onDeleteUser={handleDeleteUser}
+            currentUserId={currentUser.id}
+            currentUser={currentUser}
+            appSettings={appSettings}
+            setAppSettings={setAppSettings}
+            onResetSettings={handleResetSettings}
+        />
 
-      {/* Reposition Modal */}
-      {pendingUpload && (
-          <RepositionModal 
-            image={pendingUpload} 
-            onSave={handleSaveReposition}
-            onCancel={() => setPendingUpload(null)}
-          />
-      )}
+        {pendingUpload && (
+            <RepositionModal 
+                image={pendingUpload}
+                onSave={handleSaveReposition}
+                onCancel={() => setPendingUpload(null)}
+            />
+        )}
+
+        {toast && (
+            <div className="fixed bottom-6 right-6 z-[100] bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300">
+                <span>{toast.message}</span>
+                {toast.onUndo && (
+                    <button onClick={toast.onUndo} className="bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs font-bold uppercase">
+                        Desfazer
+                    </button>
+                )}
+            </div>
+        )}
     </div>
   );
 }
