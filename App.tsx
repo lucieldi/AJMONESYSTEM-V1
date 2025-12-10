@@ -45,6 +45,14 @@ const EMOJI_LIST = [
     '💻', '🔒', '📦', '🎁', '🎓', '💊', '⚽', '⭐', '❤️', '⚠️'
 ];
 
+const DEFAULT_SETTINGS: AppSettings = {
+    showSidebar: true,
+    showBreadcrumbs: true,
+    showGreeting: true,
+    sidebarHoverBehavior: false,
+    theme: 'dark'
+};
+
 // --- Helpers ---
 const getCoverUrl = (cover?: string) => {
     if (!cover) return null;
@@ -188,13 +196,14 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); 
 
-  // App Visibility Settings
+  // App Visibility Settings (Persisted)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
       try {
           const saved = localStorage.getItem('ajm_app_settings');
-          return saved ? JSON.parse(saved) : { showSidebar: true, showBreadcrumbs: true, showGreeting: true, theme: 'dark' };
+          // Merge saved settings with defaults to ensure new properties (like sidebarHoverBehavior) are populated
+          return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
       } catch {
-          return { showSidebar: true, showBreadcrumbs: true, showGreeting: true, theme: 'dark' };
+          return DEFAULT_SETTINGS;
       }
   });
 
@@ -308,7 +317,13 @@ function App() {
   const handleAddUser = async (newUser: User & { password?: string }) => {
       try {
         const created = await userService.createUser(newUser);
-        setUsers(prev => [...prev, created]);
+        setUsers(prev => {
+            // Prevent duplicates (Defensive check)
+            if (prev.some(u => u.id === created.id || u.username === created.username)) {
+                return prev;
+            }
+            return [...prev, created];
+        });
       } catch (e) {
           console.error(e);
           alert("Não foi possível criar o usuário. Verifique se o nome já está em uso.");
@@ -489,6 +504,14 @@ function App() {
       }
   };
 
+  const handleResetSettings = () => {
+      if (confirm('Tem certeza que deseja restaurar as configurações de aparência para o padrão?')) {
+          setAppSettings(DEFAULT_SETTINGS);
+          setToast({ message: 'Configurações restauradas com sucesso!' });
+          setTimeout(() => setToast(null), 3000);
+      }
+  };
+
   // --- Ticket Handlers ---
   const handleAddTicket = (ticket: SupportTicket) => {
       setSupportTickets(prev => [ticket, ...prev]);
@@ -577,9 +600,16 @@ function App() {
   // --- Render Helpers ---
 
   const renderSidebar = () => (
-    <div className={`fixed inset-y-0 left-0 z-40 bg-notion-sidebar border-r border-[#333] flex flex-col transition-transform duration-300 md:relative md:translate-x-0 ${
-        appSettings.showSidebar && isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:w-0 md:overflow-hidden'
-    }`}>
+    <div 
+        onMouseLeave={() => {
+            if (appSettings.sidebarHoverBehavior) {
+                setIsSidebarOpen(false);
+            }
+        }}
+        className={`fixed inset-y-0 left-0 z-40 bg-notion-sidebar border-r border-[#333] flex flex-col transition-transform duration-300 md:relative md:translate-x-0 ${
+            appSettings.showSidebar && isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:w-0 md:overflow-hidden'
+        }`}
+    >
       <div className="p-4 flex items-center justify-between group">
         <div className="flex items-center gap-2 font-medium truncate">
           <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center text-xs text-white font-bold">A</div>
@@ -1228,7 +1258,12 @@ function App() {
 
       {/* Mobile Toggle */}
       {!isSidebarOpen && appSettings.showSidebar && (
-          <div className="absolute top-4 left-4 z-50">
+          <div 
+            className="absolute top-4 left-4 z-50 p-2 -m-2" 
+            onMouseEnter={() => {
+                if(appSettings.sidebarHoverBehavior) setIsSidebarOpen(true);
+            }}
+          >
              <Menu className="cursor-pointer text-gray-500 dark:text-notion-muted hover:text-black dark:hover:text-white" onClick={() => setIsSidebarOpen(true)}/>
           </div>
       )}
@@ -1313,6 +1348,7 @@ function App() {
          currentUser={currentUser}
          appSettings={appSettings}
          setAppSettings={setAppSettings}
+         onResetSettings={handleResetSettings}
       />
 
       {/* Reposition Modal */}

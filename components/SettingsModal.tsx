@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check, Moon, Sun, Camera, Upload } from 'lucide-react';
+import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check, Moon, Sun, Camera, Upload, Loader2, MousePointer2, RotateCcw } from 'lucide-react';
 import { User, UserRole, AppSettings } from '../types';
 import { fileService } from '../services/fileService';
 
@@ -8,20 +8,28 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   users: User[];
-  onAddUser: (user: User & { password?: string }) => void;
-  onUpdateUser: (user: User & { password?: string }) => void;
+  onAddUser: (user: User & { password?: string }) => Promise<void>; // Updated to Promise
+  onUpdateUser: (user: User & { password?: string }) => Promise<void>; // Updated to Promise
   onDeleteUser: (userId: string) => void;
   currentUserId: string;
   currentUser: User;
   appSettings: AppSettings;
   setAppSettings: (settings: AppSettings) => void;
+  onResetSettings: () => void;
 }
 
 type Tab = 'users' | 'security' | 'appearance';
 
-const EMOJI_PRESETS = ['👤', '👩‍💼', '👨‍💻', '🚀', '⭐', '🐱', '🐶', '🤖', '👽', '🦄'];
+// Lista expandida de presets
+const EMOJI_PRESETS = [
+    '👤', '👩‍💼', '👨‍💻', '🤵', '👷', 
+    '🚀', '⭐', '🔥', '💡', '✅', 
+    '🐱', '🐶', '🦊', '🦁', '🐸', 
+    '🤖', '👽', '👻', '💀', '🤡',
+    '🦄', '🐲', '🌵', '🍄', '🌍'
+];
 
-const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onUpdateUser, onDeleteUser, currentUserId, currentUser, appSettings, setAppSettings }) => {
+const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onUpdateUser, onDeleteUser, currentUserId, currentUser, appSettings, setAppSettings, onResetSettings }) => {
   const [activeTab, setActiveTab] = useState<Tab>(currentUser.role === 'admin' ? 'users' : 'appearance');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -47,6 +55,10 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
   const [role, setRole] = useState<UserRole>('user');
   const [avatar, setAvatar] = useState('👤');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // New state to prevent double clicks
+  
+  // Estado para controlar o picker de emoji
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Security State
   const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -81,6 +93,8 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
     setAvatar('👤');
     setEditingUserId(null);
     setDeleteConfirmId(null);
+    setShowEmojiPicker(false);
+    setIsSubmitting(false);
   };
 
   const handleEditClick = (user: User) => {
@@ -92,6 +106,8 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
       setRole(user.role);
       setAvatar(user.avatar);
       setDeleteConfirmId(null); 
+      setShowEmojiPicker(false);
+      setIsSubmitting(false);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,9 +125,9 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
       }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !username) return;
+    if (!name || !username || isSubmitting) return;
 
     // VALIDAÇÃO DE DUPLICIDADE
     if (!editingUserId) {
@@ -131,25 +147,33 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
       avatar
     };
 
-    if (editingUserId) {
-        // Update Flow
-        const updatePayload = { ...baseUserData };
-        if (password.trim()) {
-            (updatePayload as any).password = password;
-        }
-        onUpdateUser(updatePayload as any);
-        
-        // If not admin, give feedback but stay on form
-        if (currentUser.role !== 'admin') {
-             // Maybe show a checkmark or toast, for now just no reset
+    setIsSubmitting(true);
+
+    try {
+        if (editingUserId) {
+            // Update Flow
+            const updatePayload = { ...baseUserData };
+            if (password.trim()) {
+                (updatePayload as any).password = password;
+            }
+            await onUpdateUser(updatePayload as any);
+            
+            // If not admin, give feedback but stay on form
+            if (currentUser.role !== 'admin') {
+                 // Maybe show a checkmark or toast, for now just no reset
+            } else {
+                resetForm();
+            }
         } else {
+            // Registration Flow
+            if (!password) return; 
+            await onAddUser({ ...baseUserData, password });
             resetForm();
         }
-    } else {
-        // Registration Flow
-        if (!password) return; 
-        onAddUser({ ...baseUserData, password });
-        resetForm();
+    } catch (error) {
+        console.error(error);
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -238,11 +262,11 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                                             avatar
                                         )
                                     )}
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
                                         <Camera size={24} className="text-white" />
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 relative">
                                     <button 
                                         type="button" 
                                         onClick={() => fileInputRef.current?.click()}
@@ -253,15 +277,49 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                                     </button>
                                     <button 
                                         type="button" 
-                                        onClick={() => {
-                                            const emoji = prompt('Digite um emoji:');
-                                            if(emoji) setAvatar(emoji);
-                                        }}
-                                        className="p-2 bg-[#333] hover:bg-[#444] rounded-full text-white transition-colors"
+                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                        className={`p-2 rounded-full text-white transition-colors ${showEmojiPicker ? 'bg-blue-600' : 'bg-[#333] hover:bg-[#444]'}`}
                                         title="Escolher Emoji"
                                     >
                                         <Smile size={14} />
                                     </button>
+                                    
+                                    {/* Emoji Picker Dropdown */}
+                                    {showEmojiPicker && (
+                                        <div className="absolute top-10 left-0 z-50 bg-[#2C2C2C] border border-[#444] rounded-lg p-2 shadow-2xl w-48 animate-in fade-in zoom-in-95 duration-150">
+                                            <div className="grid grid-cols-5 gap-1">
+                                                {EMOJI_PRESETS.map((emoji) => (
+                                                    <button
+                                                        key={emoji}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setAvatar(emoji);
+                                                            setShowEmojiPicker(false);
+                                                        }}
+                                                        className="w-8 h-8 flex items-center justify-center rounded hover:bg-[#444] text-xl transition-colors"
+                                                    >
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="mt-2 pt-2 border-t border-[#444]">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Outro..." 
+                                                    className="w-full bg-[#191919] border border-[#333] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500"
+                                                    maxLength={2}
+                                                    onChange={(e) => {
+                                                        if(e.target.value) {
+                                                            setAvatar(e.target.value);
+                                                            // Opcional: fechar ao digitar
+                                                            // setShowEmojiPicker(false);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <input 
                                         type="file" 
                                         ref={fileInputRef} 
@@ -311,7 +369,12 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                                     {editingUserId && currentUser.role === 'admin' && (
                                         <button type="button" onClick={resetForm} className="text-gray-400 hover:text-white px-4 py-2 text-sm">Cancelar</button>
                                     )}
-                                    <button type="submit" disabled={!name || !username || (!editingUserId && !password)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-lg">
+                                    <button 
+                                        type="submit" 
+                                        disabled={!name || !username || (!editingUserId && !password) || isSubmitting} 
+                                        className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-lg flex items-center gap-2"
+                                    >
+                                        {isSubmitting && <Loader2 size={14} className="animate-spin" />}
                                         {editingUserId ? 'Salvar Alterações' : 'Criar Usuário'}
                                     </button>
                                 </div>
@@ -325,7 +388,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             {users.map(user => (
                                 <div key={user.id} className="p-4 border-b border-[#333] last:border-0 flex items-center justify-between hover:bg-[#252525] transition-colors">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg overflow-hidden border border-[#444]">
+                                        <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg border border-[#444] overflow-hidden">
                                             {user.avatar.match(/^(http|data:)/) ? (
                                                 <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                                             ) : user.avatar}
@@ -463,6 +526,23 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             </div>
                         </div>
 
+                        {/* New Sidebar Hover Toggle */}
+                        <div className="bg-[#202020] p-4 rounded-lg border border-[#333] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <MousePointer2 size={20} className="text-gray-400"/>
+                                <div>
+                                    <h3 className="font-medium text-white">Menu Expansível (Hover)</h3>
+                                    <p className="text-xs text-gray-500">Abrir a barra lateral ao passar o mouse.</p>
+                                </div>
+                            </div>
+                            <div 
+                                onClick={() => setAppSettings({ ...appSettings, sidebarHoverBehavior: !appSettings.sidebarHoverBehavior })}
+                                className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${appSettings.sidebarHoverBehavior ? 'bg-blue-600' : 'bg-[#333]'}`}
+                            >
+                                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${appSettings.sidebarHoverBehavior ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                            </div>
+                        </div>
+
                          <div className="bg-[#202020] p-4 rounded-lg border border-[#333] flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <Eye size={20} className="text-gray-400"/>
@@ -493,6 +573,16 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             >
                                 <div className={`w-4 h-4 rounded-full bg-white transition-transform ${appSettings.showGreeting ? 'translate-x-6' : 'translate-x-0'}`}></div>
                             </div>
+                        </div>
+
+                        {/* RESET BUTTON */}
+                        <div className="pt-4 mt-4 border-t border-[#333]">
+                            <button
+                                onClick={onResetSettings}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded text-sm font-medium text-red-400 hover:bg-red-900/10 hover:text-red-300 transition-colors border border-transparent hover:border-red-900/30"
+                            >
+                                <RotateCcw size={16} /> Restaurar Configurações Iniciais
+                            </button>
                         </div>
                     </div>
                  </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Send, Trash2, Users, MessageSquare, ChevronLeft, Search, CheckCheck, Circle } from 'lucide-react';
+import { X, Send, Trash2, Users, MessageSquare, ChevronLeft, Search, CheckCheck, Circle, Shield, User as UserIcon, BadgeCheck } from 'lucide-react';
 import { ChatMessage, User } from '../types';
 import { chatService } from '../services/chatService';
 
@@ -310,6 +310,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                 {currentView === 'contacts' ? (
                     <div>
                         <h3 className="font-bold text-lg text-white">Chat AJM</h3>
+                        <p className="text-[10px] text-gray-400">Conectado como {currentUser.name}</p>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2">
@@ -318,7 +319,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                         </div>
                         <div>
                              <h3 className="font-bold text-sm text-white">
-                                 {selectedContact === 'GLOBAL' ? 'Equipe Global' : selectedContact.name}
+                                 {selectedContact === 'GLOBAL' ? 'Chat Geral (Todos)' : selectedContact.name}
                              </h3>
                              <span className={`text-[10px] block font-medium ${selectedContact !== 'GLOBAL' && statuses[selectedContact.id] === 'online' ? 'text-green-400' : 'text-gray-400'}`}>
                                  {selectedContact === 'GLOBAL' 
@@ -364,7 +365,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-center mb-1">
-                                    <h4 className="font-bold text-gray-200">Equipe Global</h4>
+                                    <h4 className="font-bold text-gray-200">Chat Geral (Todos)</h4>
                                     {getLastMessage('GLOBAL') && (
                                         <span className="text-[10px] text-gray-500">
                                             {new Date(getLastMessage('GLOBAL')!.timestamp).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
@@ -400,7 +401,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                             <div 
                                 key={user.id}
                                 onClick={() => { setSelectedContact(user); setCurrentView('conversation'); }}
-                                className="flex items-center gap-3 p-3 px-4 hover:bg-[#202020] cursor-pointer transition-colors relative"
+                                className="flex items-center gap-3 p-3 px-4 hover:bg-[#202020] cursor-pointer transition-colors relative group"
                             >
                                 <div className="relative shrink-0">
                                     <div className="w-10 h-10 rounded-full bg-[#2C2C2C] flex items-center justify-center text-lg border border-[#333] overflow-hidden">
@@ -410,7 +411,17 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-center mb-0.5">
-                                        <h4 className={`font-semibold text-sm ${unreadCount > 0 ? 'text-white' : 'text-gray-200'}`}>{user.name}</h4>
+                                        <div className="flex items-center">
+                                            <h4 className={`font-semibold text-sm ${unreadCount > 0 ? 'text-white' : 'text-gray-200'}`}>
+                                                {user.name}
+                                            </h4>
+                                            {/* ROLE BADGES FOR CLARITY */}
+                                            {user.role === 'admin' ? (
+                                                <Shield size={12} className="text-blue-400 ml-1.5" title="Administrador"/>
+                                            ) : (
+                                                <BadgeCheck size={12} className="text-gray-500 ml-1.5" title="Usuário Padrão"/>
+                                            )}
+                                        </div>
                                         {lastMsg && (
                                             <span className={`text-[10px] ${unreadCount > 0 ? 'text-blue-400' : 'text-gray-500'}`}>
                                                 {new Date(lastMsg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -420,7 +431,7 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                                     <p className={`text-xs truncate ${unreadCount > 0 ? 'text-gray-200 font-medium' : (lastMsg ? 'text-gray-400' : 'text-gray-600 italic')}`}>
                                         {lastMsg 
                                             ? (lastMsg.senderId === currentUser.username ? `Você: ${lastMsg.text}` : lastMsg.text)
-                                            : 'Iniciar uma conversa'}
+                                            : 'Iniciar conversa'}
                                     </p>
                                 </div>
                                 {unreadCount > 0 && (

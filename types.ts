@@ -21,6 +21,7 @@ export interface AppSettings {
   showSidebar: boolean;
   showBreadcrumbs: boolean;
   showGreeting: boolean;
+  sidebarHoverBehavior: boolean; // New setting
   theme: 'light' | 'dark';
 }
 
