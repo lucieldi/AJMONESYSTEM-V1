@@ -712,8 +712,10 @@ function App() {
       <div className="p-4 border-t border-[#333] bg-[#1c1c1c]">
           <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm">
-                      {currentUser?.avatar}
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm overflow-hidden">
+                      {currentUser?.avatar.match(/^(http|data:)/) ? (
+                          <img src={currentUser.avatar} alt="User" className="w-full h-full object-cover"/>
+                      ) : currentUser?.avatar}
                   </div>
                   <div className="flex flex-col">
                       <span className="text-sm font-medium">{currentUser?.name}</span>

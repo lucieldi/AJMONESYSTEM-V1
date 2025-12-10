@@ -122,6 +122,13 @@ const AdminDashboard: React.FC<Props> = ({ projects, users, onNavigateToProject 
       );
   }, [users, userSearch]);
 
+  const renderAvatar = (avatar: string) => {
+      if (avatar.match(/^(http|data:)/)) {
+          return <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />;
+      }
+      return avatar;
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto">
         <div className="mb-8">
@@ -366,8 +373,8 @@ const AdminDashboard: React.FC<Props> = ({ projects, users, onNavigateToProject 
                                     <tr key={user.id} className="hover:bg-[#2C2C2C] group transition-colors">
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg border border-[#444]">
-                                                    {user.avatar}
+                                                <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg border border-[#444] overflow-hidden">
+                                                    {renderAvatar(user.avatar)}
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-white">{user.name}</div>

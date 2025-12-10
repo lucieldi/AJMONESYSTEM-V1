@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check, Moon, Sun } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, UserPlus, Trash2, Shield, User as UserIcon, Edit2, Lock, Eye, Users, Layout, Send, AlertTriangle, Smile, Check, Moon, Sun, Camera, Upload } from 'lucide-react';
 import { User, UserRole, AppSettings } from '../types';
+import { fileService } from '../services/fileService';
 
 interface Props {
   isOpen: boolean;
@@ -18,8 +19,11 @@ interface Props {
 
 type Tab = 'users' | 'security' | 'appearance';
 
+const EMOJI_PRESETS = ['👤', '👩‍💼', '👨‍💻', '🚀', '⭐', '🐱', '🐶', '🤖', '👽', '🦄'];
+
 const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onUpdateUser, onDeleteUser, currentUserId, currentUser, appSettings, setAppSettings }) => {
   const [activeTab, setActiveTab] = useState<Tab>(currentUser.role === 'admin' ? 'users' : 'appearance');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Initialize state when modal opens
   useEffect(() => {
@@ -42,6 +46,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('user');
   const [avatar, setAvatar] = useState('👤');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Security State
   const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -87,6 +92,21 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
       setRole(user.role);
       setAvatar(user.avatar);
       setDeleteConfirmId(null); 
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          setIsUploading(true);
+          try {
+              const result = await fileService.uploadFile(file);
+              setAvatar(result.url);
+          } catch (err) {
+              alert("Erro ao carregar imagem");
+          } finally {
+              setIsUploading(false);
+          }
+      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -203,47 +223,98 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             {editingUserId ? <Edit2 size={16} /> : <UserPlus size={16} />} 
                             {editingUserId ? (currentUser.role === 'admin' ? 'Editar Usuário' : 'Editar Meus Dados') : 'Registrar Novo Usuário'}
                         </h3>
-                        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-                            <div className="col-span-1 space-y-1">
-                                <label className="text-xs text-notion-muted">Nome Completo</label>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="ex: João Silva"/>
-                            </div>
-                            <div className="col-span-1 space-y-1">
-                                <label className="text-xs text-notion-muted">Usuário</label>
-                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="ex: joao" disabled={currentUser.role !== 'admin' && editingUserId !== null} />
-                            </div>
-                            <div className="col-span-2 space-y-1">
-                                <label className="text-xs text-notion-muted">Endereço de Email</label>
-                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="usuario@empresa.com"/>
-                            </div>
-                            {/* Password Field - Full width for standard users, half for admins (who have Role next to it) */}
-                            <div className={`${currentUser.role === 'admin' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
-                                <label className="text-xs text-notion-muted">Senha {editingUserId && "(Em branco para manter)"}</label>
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="••••••"/>
-                            </div>
+                        
+                        <form onSubmit={handleSubmit} className="grid grid-cols-[auto_1fr_1fr] gap-6">
                             
-                            {/* Role Field - ONLY VISIBLE TO ADMINS */}
-                            {currentUser.role === 'admin' && (
-                                <div className="col-span-1 space-y-1">
-                                    <label className="text-xs text-notion-muted">Função</label>
-                                    <select 
-                                        value={role} 
-                                        onChange={e => setRole(e.target.value as UserRole)} 
-                                        className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600"
-                                    >
-                                        <option value="user">Usuário Padrão</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
+                            {/* Avatar Section */}
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="w-24 h-24 rounded-full bg-[#151515] border-2 border-[#333] flex items-center justify-center text-4xl overflow-hidden relative group">
+                                    {isUploading ? (
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                                    ) : (
+                                        avatar.match(/^(http|data:)/) ? (
+                                            <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            avatar
+                                        )
+                                    )}
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                        <Camera size={24} className="text-white" />
+                                    </div>
                                 </div>
-                            )}
-                            
-                            <div className="col-span-2 flex justify-end gap-2 mt-2">
-                                {editingUserId && currentUser.role === 'admin' && (
-                                    <button type="button" onClick={resetForm} className="text-gray-400 hover:text-white px-4 py-2 text-sm">Cancelar</button>
+                                <div className="flex gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-2 bg-[#333] hover:bg-[#444] rounded-full text-white transition-colors"
+                                        title="Carregar Foto"
+                                    >
+                                        <Upload size={14} />
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            const emoji = prompt('Digite um emoji:');
+                                            if(emoji) setAvatar(emoji);
+                                        }}
+                                        className="p-2 bg-[#333] hover:bg-[#444] rounded-full text-white transition-colors"
+                                        title="Escolher Emoji"
+                                    >
+                                        <Smile size={14} />
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*"
+                                        onChange={handleAvatarUpload}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Inputs */}
+                            <div className="col-span-2 grid grid-cols-2 gap-4">
+                                <div className="col-span-1 space-y-1">
+                                    <label className="text-xs text-notion-muted">Nome Completo</label>
+                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="ex: João Silva"/>
+                                </div>
+                                <div className="col-span-1 space-y-1">
+                                    <label className="text-xs text-notion-muted">Usuário</label>
+                                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="ex: joao" disabled={currentUser.role !== 'admin' && editingUserId !== null} />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs text-notion-muted">Endereço de Email</label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="usuario@empresa.com"/>
+                                </div>
+                                {/* Password Field - Full width for standard users, half for admins (who have Role next to it) */}
+                                <div className={`${currentUser.role === 'admin' ? 'col-span-1' : 'col-span-2'} space-y-1`}>
+                                    <label className="text-xs text-notion-muted">Senha {editingUserId && "(Em branco para manter)"}</label>
+                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600" placeholder="••••••"/>
+                                </div>
+                                
+                                {/* Role Field - ONLY VISIBLE TO ADMINS */}
+                                {currentUser.role === 'admin' && (
+                                    <div className="col-span-1 space-y-1">
+                                        <label className="text-xs text-notion-muted">Função</label>
+                                        <select 
+                                            value={role} 
+                                            onChange={e => setRole(e.target.value as UserRole)} 
+                                            className="w-full bg-[#151515] border border-[#333] rounded px-3 py-2 text-sm text-white outline-none focus:border-blue-600"
+                                        >
+                                            <option value="user">Usuário Padrão</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </div>
                                 )}
-                                <button type="submit" disabled={!name || !username || (!editingUserId && !password)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-lg">
-                                    {editingUserId ? 'Salvar Alterações' : 'Criar Usuário'}
-                                </button>
+                                
+                                <div className="col-span-2 flex justify-end gap-2 mt-2">
+                                    {editingUserId && currentUser.role === 'admin' && (
+                                        <button type="button" onClick={resetForm} className="text-gray-400 hover:text-white px-4 py-2 text-sm">Cancelar</button>
+                                    )}
+                                    <button type="submit" disabled={!name || !username || (!editingUserId && !password)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded text-sm font-medium transition-colors shadow-lg">
+                                        {editingUserId ? 'Salvar Alterações' : 'Criar Usuário'}
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -254,7 +325,11 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, users, onAddUser, onU
                             {users.map(user => (
                                 <div key={user.id} className="p-4 border-b border-[#333] last:border-0 flex items-center justify-between hover:bg-[#252525] transition-colors">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg">{user.avatar}</div>
+                                        <div className="w-10 h-10 rounded-full bg-[#333] flex items-center justify-center text-lg overflow-hidden border border-[#444]">
+                                            {user.avatar.match(/^(http|data:)/) ? (
+                                                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                                            ) : user.avatar}
+                                        </div>
                                         <div>
                                             <div className="font-medium text-white flex items-center gap-2">
                                                 {user.name} 

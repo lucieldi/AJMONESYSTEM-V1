@@ -279,6 +279,13 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
       }
   };
 
+  const renderAvatar = (avatar: string) => {
+      if (avatar.match(/^(http|data:)/)) {
+          return <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />;
+      }
+      return avatar;
+  };
+
   const filteredContacts = users.filter(u => 
     u.id !== currentUser.id && 
     u.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -306,8 +313,8 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                     </div>
                 ) : (
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-sm shadow-inner overflow-hidden relative">
-                             {selectedContact === 'GLOBAL' ? '#' : selectedContact.avatar}
+                        <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-sm shadow-inner overflow-hidden relative border border-[#444]">
+                             {selectedContact === 'GLOBAL' ? '#' : renderAvatar(selectedContact.avatar)}
                         </div>
                         <div>
                              <h3 className="font-bold text-sm text-white">
@@ -396,8 +403,8 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                                 className="flex items-center gap-3 p-3 px-4 hover:bg-[#202020] cursor-pointer transition-colors relative"
                             >
                                 <div className="relative shrink-0">
-                                    <div className="w-10 h-10 rounded-full bg-[#2C2C2C] flex items-center justify-center text-lg border border-[#333]">
-                                        {user.avatar}
+                                    <div className="w-10 h-10 rounded-full bg-[#2C2C2C] flex items-center justify-center text-lg border border-[#333] overflow-hidden">
+                                        {renderAvatar(user.avatar)}
                                     </div>
                                     <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#121212] ${getStatusColor(status)}`}></div>
                                 </div>
@@ -459,7 +466,9 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                             <div key={msg.id} className={`flex w-full flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                 {!isMe && selectedContact === 'GLOBAL' && (
                                     <div className="flex items-center gap-1 ml-1 mb-0.5">
-                                        <span className="text-[10px]">{senderDetails.avatar}</span>
+                                        <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center bg-[#333] text-[10px]">
+                                            {renderAvatar(senderDetails.avatar)}
+                                        </div>
                                         <span className="text-[10px] text-gray-400 font-medium">{senderDetails.name}</span>
                                     </div>
                                 )}
