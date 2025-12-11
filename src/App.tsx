@@ -15,7 +15,7 @@ import {
   LogOut, Settings, Home, Layout, MessageSquare, 
   Users as UsersIcon, ChevronRight, Monitor, Plus
 } from 'lucide-react';
-import { generateKanbanBoard, generateIshikawaData, generateScrumBacklog } from './services/geminiService';
+import { generateKanbanBoard, generateIshikawaData } from './services/geminiService';
 
 const DEFAULT_SETTINGS: AppSettings = {
   showSidebar: true,
@@ -24,12 +24,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   sidebarHoverBehavior: false,
   theme: 'dark'
 };
-
-const INITIAL_TEAM_KANBAN: KanbanColumn[] = [
-    { id: 'tk1', title: 'Ideias da Equipe', color: '#6366f1', tasks: [] },
-    { id: 'tk2', title: 'Em Andamento', color: '#eab308', tasks: [] },
-    { id: 'tk3', title: 'Concluído', color: '#22c55e', tasks: [] }
-];
 
 const App: React.FC = () => {
   // Global State
@@ -43,27 +37,14 @@ const App: React.FC = () => {
   const [activeProjectTab, setActiveProjectTab] = useState<'KANBAN' | 'SCRUM' | 'ISHIKAWA' | 'DOCS'>('KANBAN');
 
   // UI State
-  const [appSettings, setAppSettings] = useState<AppSettings>(() => {
-      try {
-          const saved = localStorage.getItem('ajm_app_settings');
-          return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-      } catch {
-          return DEFAULT_SETTINGS;
-      }
-  });
+  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   // Data State
-  const [tickets, setTickets] = useState<SupportTicket[]>(() => {
-      const saved = localStorage.getItem('ajm_support_tickets');
-      return saved ? JSON.parse(saved) : [];
-  });
-  const [teamKanban, setTeamKanban] = useState<KanbanColumn[]>(() => {
-      const saved = localStorage.getItem('ajm_team_kanban');
-      return saved ? JSON.parse(saved) : INITIAL_TEAM_KANBAN;
-  });
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [teamKanban, setTeamKanban] = useState<KanbanColumn[]>([]);
 
   // Effects
   useEffect(() => {
@@ -75,28 +56,6 @@ const App: React.FC = () => {
     };
     loadData();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('ajm_app_settings', JSON.stringify(appSettings));
-    const root = document.documentElement;
-    if (appSettings.theme === 'light') {
-        root.classList.remove('dark');
-        document.body.style.backgroundColor = '#f3f4f6';
-        document.body.style.color = '#1f2937';
-    } else {
-        root.classList.add('dark');
-        document.body.style.backgroundColor = '#191919';
-        document.body.style.color = '#D4D4D4';
-    }
-  }, [appSettings]);
-
-  useEffect(() => {
-      localStorage.setItem('ajm_support_tickets', JSON.stringify(tickets));
-  }, [tickets]);
-
-  useEffect(() => {
-      localStorage.setItem('ajm_team_kanban', JSON.stringify(teamKanban));
-  }, [teamKanban]);
 
   // Handlers
   const handleLogin = (user: User) => {
@@ -185,29 +144,10 @@ const App: React.FC = () => {
                           </div>
                       )}
                       {activeProjectTab === 'SCRUM' && (
-                          <div className="h-full flex flex-col">
-                              <div className="flex justify-end p-2 px-6">
-                                  <button 
-                                    onClick={async () => {
-                                        const items = await generateScrumBacklog(currentProject.title, currentProject.content);
-                                        if (items && items.length > 0) {
-                                            const newScrumData = {
-                                                ...currentProject.scrumData,
-                                                backlog: [...currentProject.scrumData.backlog, ...items]
-                                            };
-                                            updateProject({ ...currentProject, scrumData: newScrumData });
-                                        }
-                                    }}
-                                    className="text-xs flex items-center gap-1 bg-purple-600/20 text-purple-400 px-2 py-1 rounded hover:bg-purple-600/30 transition-colors"
-                                  >
-                                      ✨ Gerar Backlog com IA
-                                  </button>
-                              </div>
-                              <ScrumBoard 
-                                  data={currentProject.scrumData}
-                                  onChange={(newData) => updateProject({ ...currentProject, scrumData: newData })}
-                              />
-                          </div>
+                          <ScrumBoard 
+                              data={currentProject.scrumData}
+                              onChange={(newData) => updateProject({ ...currentProject, scrumData: newData })}
+                          />
                       )}
                       {activeProjectTab === 'ISHIKAWA' && (
                           <div className="p-8 h-full flex flex-col">
@@ -241,7 +181,7 @@ const App: React.FC = () => {
 
       // Default HOME
       return (
-          <div className="p-8 h-full overflow-y-auto">
+          <div className="p-8">
               <h1 className="text-3xl font-bold text-white mb-6">Meus Projetos</h1>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {projects.map(p => (
@@ -287,21 +227,13 @@ const App: React.FC = () => {
     <div className={`flex h-screen bg-[#191919] text-[#D4D4D4] font-sans overflow-hidden ${appSettings.theme}`}>
       {/* Sidebar */}
       {appSettings.showSidebar && (
-        <div 
-            onMouseLeave={() => {
-                if (appSettings.sidebarHoverBehavior) {
-                    // Logic to hide sidebar could go here if managed by external state, 
-                    // currently appSettings controls visibility preference globally.
-                }
-            }}
-            className={`w-64 bg-[#202020] border-r border-[#333] flex flex-col transition-all duration-300 shrink-0`}
-        >
+        <div className={`w-64 bg-[#202020] border-r border-[#333] flex flex-col transition-all duration-300 shrink-0`}>
            <div className="p-4 flex items-center gap-3 border-b border-[#333]">
                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white">AJM</div>
                <span className="font-bold text-white tracking-wide">OneSystem</span>
            </div>
            
-           <div className="flex-1 overflow-y-auto py-4 space-y-1 px-2 custom-scrollbar">
+           <div className="flex-1 overflow-y-auto py-4 space-y-1 px-2">
                <button onClick={() => { setView('HOME'); setCurrentProjectId(null); }} className={`w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium ${view === 'HOME' ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#2C2C2C] hover:text-white'}`}>
                    <Home size={18}/> Início
                </button>

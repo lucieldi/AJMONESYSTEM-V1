@@ -417,9 +417,9 @@ const GlobalChat: React.FC<Props> = ({ isOpen, onClose, onNewMessage, currentUse
                                             </h4>
                                             {/* ROLE BADGES FOR CLARITY */}
                                             {user.role === 'admin' ? (
-                                                <Shield size={12} className="text-blue-400 ml-1.5" title="Administrador"/>
+                                                <span title="Administrador"><Shield size={12} className="text-blue-400 ml-1.5" /></span>
                                             ) : (
-                                                <BadgeCheck size={12} className="text-gray-500 ml-1.5" title="Usuário Padrão"/>
+                                                <span title="Usuário Padrão"><BadgeCheck size={12} className="text-gray-500 ml-1.5" /></span>
                                             )}
                                         </div>
                                         {lastMsg && (
