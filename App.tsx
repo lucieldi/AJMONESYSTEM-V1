@@ -836,8 +836,8 @@ function App() {
   );
 
   const renderHome = () => (
-    <div className="relative min-h-full w-full">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="relative h-full w-full overflow-y-auto custom-scrollbar">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-[-200px] left-[-200px] w-[600px] h-[600px] bg-green-600/10 rounded-full blur-[120px]"></div>
           <div className="absolute bottom-[-200px] right-[-200px] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px]"></div>
       </div>
