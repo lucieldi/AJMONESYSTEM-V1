@@ -119,4 +119,15 @@ export interface SupportTicket {
   createdAt: string;
 }
 
-export type NavigationState = 'HOME' | 'PROJECT' | 'ADMIN_DASHBOARD' | 'IT_HELPDESK';
+export type NavigationState = 
+  | 'HOME' 
+  | 'PROJECT' 
+  | 'ADMIN_DASHBOARD' 
+  | 'IT_HELPDESK' 
+  | 'TEAM_AREA' 
+  | 'TEAM_CALENDAR'
+  | 'TEAM_DOCUMENTS'
+  | 'TEAM_MEMBERS'
+  | 'TEAM_TRAINING'
+  | 'TEAM_RECORDS'
+  | 'TEAM_KANBAN';

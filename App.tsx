@@ -17,13 +17,14 @@ import GlobalChat from './components/GlobalChat';
 import SettingsModal from './components/SettingsModal';
 import AdminDashboard from './components/AdminDashboard';
 import SupportHelpdesk from './components/SupportHelpdesk';
+import TeamArea from './components/TeamArea';
 
 import { 
     Search, Home, LayoutDashboard, Settings, MessageSquare, Plus, Trash2, ChevronDown, 
     RotateCcw, Monitor, LogOut, ShieldCheck, Briefcase, User as UserIcon, ChevronRight, 
     Clock, Trello, GitMerge, MoreHorizontal, ImageIcon, Upload, MoveVertical, Type, 
     Palette, Sun, Moon, MousePointer2, AlertTriangle, Check, Send, X, Smile, Camera, 
-    Eye, Layout, FileText, List, Layers, Trophy 
+    Eye, Layout, FileText, List, Layers, Trophy, Users, Calendar, BookOpen, Database, Dot 
 } from 'lucide-react';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -43,7 +44,7 @@ const EMOJI_LIST = [
     '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
     '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
     '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', 'hk',
-    '🤐', '🥴', '🤢', '🤮', '😷', '🤒', '🤕', '👽', '👻', '🤖', 
+    '🤐', '🥴', '🤢', '🤮', '😷', '🤒', '🤕', '👻', '👽', '🤖', 
     '💩', '💤', '⭐', '🔥', '👍', '👎'
 ];
 
@@ -62,6 +63,16 @@ const THEMES = [
     '#2d2b55', 
     '#1e1e1e', 
     '#fafafa'
+];
+
+// --- Mock Data for Team Kanban ---
+const INITIAL_TEAM_KANBAN: KanbanColumn[] = [
+    { id: 'tk1', title: 'Ideias da Equipe', color: '#6366f1', tasks: [
+        { id: 'tkt1', content: 'Planejar Happy Hour', priority: 'Low' },
+        { id: 'tkt2', content: 'Organizar Arquivos Antigos', priority: 'Medium' }
+    ]},
+    { id: 'tk2', title: 'Em Andamento', color: '#eab308', tasks: [] },
+    { id: 'tk3', title: 'Concluído', color: '#22c55e', tasks: [] }
 ];
 
 const getCoverUrl = (cover?: string) => {
@@ -218,6 +229,10 @@ function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); 
+  const [teamKanbanData, setTeamKanbanData] = useState<KanbanColumn[]>(() => {
+      const saved = localStorage.getItem('ajm_team_kanban');
+      return saved ? JSON.parse(saved) : INITIAL_TEAM_KANBAN;
+  });
 
   // App Visibility Settings (Persisted)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -236,6 +251,9 @@ function App() {
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
   
+  // Sidebar Expansion States
+  const [isTeamAreaExpanded, setIsTeamAreaExpanded] = useState(false);
+
   // Menus & Modals
   const [showStyleMenu, setShowStyleMenu] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -298,6 +316,10 @@ function App() {
   useEffect(() => {
       localStorage.setItem('ajm_support_tickets', JSON.stringify(supportTickets));
   }, [supportTickets]);
+
+  useEffect(() => {
+    localStorage.setItem('ajm_team_kanban', JSON.stringify(teamKanbanData));
+  }, [teamKanbanData]);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -605,6 +627,14 @@ function App() {
       }
   };
 
+  const handleCreateNewTeamPage = () => {
+      const pageName = prompt("Nome da nova página:");
+      if (pageName) {
+          setToast({ message: `Página "${pageName}" criada com sucesso! (Simulação)` });
+          setTimeout(() => setToast(null), 3000);
+      }
+  };
+
   // --- Render Helpers ---
 
   const renderSidebar = () => (
@@ -663,6 +693,46 @@ function App() {
               </span>
           )}
         </button>
+
+        {/* --- TEAM AREA ACCORDION --- */}
+        <div>
+            <button 
+                onClick={() => setIsTeamAreaExpanded(!isTeamAreaExpanded)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm select-none transition-colors ${navState.startsWith('TEAM_') ? 'bg-notion-hover text-notion-text' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}
+            >
+              <div className="flex items-center gap-2 flex-1">
+                 <Users size={16} /> Área da Equipe
+              </div>
+              <ChevronDown size={14} className={`transition-transform duration-200 ${isTeamAreaExpanded ? '' : '-rotate-90'}`}/>
+            </button>
+
+            {/* Sub-menu */}
+            {isTeamAreaExpanded && (
+                <div className="ml-7 pl-2 border-l border-[#333] space-y-0.5 mt-1 animate-in slide-in-from-left-2 duration-200">
+                     <button onClick={() => handleNavClick('TEAM_CALENDAR')} className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm ${navState === 'TEAM_CALENDAR' ? 'bg-[#333] text-white' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}>
+                        <Calendar size={14}/> Agenda
+                     </button>
+                     <button onClick={() => handleNavClick('TEAM_DOCUMENTS')} className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm ${navState === 'TEAM_DOCUMENTS' ? 'bg-[#333] text-white' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}>
+                        <FileText size={14}/> Documentos
+                     </button>
+                     <button onClick={() => handleNavClick('TEAM_MEMBERS')} className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm ${navState === 'TEAM_MEMBERS' ? 'bg-[#333] text-white' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}>
+                        <Users size={14}/> Equipe
+                     </button>
+                     <button onClick={() => handleNavClick('TEAM_TRAINING')} className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm ${navState === 'TEAM_TRAINING' ? 'bg-[#333] text-white' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}>
+                        <BookOpen size={14}/> Treinamentos
+                     </button>
+                     <button onClick={() => handleNavClick('TEAM_RECORDS')} className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm ${navState === 'TEAM_RECORDS' ? 'bg-[#333] text-white' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}>
+                        <Database size={14}/> Registros
+                     </button>
+                     <button onClick={() => handleNavClick('TEAM_KANBAN')} className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm ${navState === 'TEAM_KANBAN' ? 'bg-[#333] text-white' : 'text-notion-muted hover:bg-notion-hover hover:text-notion-text'}`}>
+                        <Trello size={14}/> Kanban
+                     </button>
+                     <button onClick={handleCreateNewTeamPage} className="w-full flex items-center gap-2 px-3 py-1 rounded-md text-sm text-notion-muted hover:text-white hover:bg-notion-hover">
+                        <Plus size={14}/> Nova Página
+                     </button>
+                </div>
+            )}
+        </div>
       </div>
 
       <div className="mt-6 px-4 flex-1 overflow-y-auto">
@@ -1244,6 +1314,15 @@ function App() {
                  <div className="p-8 h-full overflow-y-auto">
                      <SupportHelpdesk currentUser={currentUser} tickets={supportTickets} onAddTicket={handleAddTicket} onUpdateTicketStatus={handleUpdateTicketStatus} />
                  </div>
+             )}
+             {(navState.startsWith('TEAM_') || navState === 'TEAM_AREA') && (
+                 <TeamArea 
+                    users={users} 
+                    currentUser={currentUser} 
+                    view={navState}
+                    teamKanbanData={teamKanbanData}
+                    onTeamKanbanChange={setTeamKanbanData}
+                 />
              )}
         </div>
 
