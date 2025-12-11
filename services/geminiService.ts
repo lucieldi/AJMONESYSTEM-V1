@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { KanbanColumn, IshikawaData, Task } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to clean JSON string if Markdown code blocks are present
 const cleanJsonString = (str: string): string => {
@@ -10,7 +9,7 @@ const cleanJsonString = (str: string): string => {
 };
 
 export const generateKanbanBoard = async (projectTitle: string, projectContext: string): Promise<KanbanColumn[]> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
     console.error("No API Key provided");
     return [];
   }
@@ -64,7 +63,7 @@ export const generateKanbanBoard = async (projectTitle: string, projectContext: 
 };
 
 export const generateIshikawaData = async (problem: string): Promise<IshikawaData | null> => {
-  if (!apiKey) return null;
+  if (!process.env.API_KEY) return null;
 
   const prompt = `
     Crie um conjunto de dados de diagrama de Ishikawa (Espinha de Peixe) para o problema/efeito: "${problem}".
@@ -113,7 +112,7 @@ export const generateIshikawaData = async (problem: string): Promise<IshikawaDat
 };
 
 export const generateScrumBacklog = async (projectTitle: string, projectContext: string): Promise<Task[]> => {
-  if (!apiKey) return [];
+  if (!process.env.API_KEY) return [];
 
   const prompt = `
     Crie um Backlog de Produto com Histórias de Usuário para um projeto intitulado "${projectTitle}".
