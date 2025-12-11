@@ -1,10 +1,15 @@
+import express from 'express';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import multer from 'multer';
+import nodemailer from 'nodemailer';
 
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
-const multer = require('multer');
-const nodemailer = require('nodemailer');
+// Configuração para __dirname em ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = 3001;
@@ -137,7 +142,8 @@ app.post('/api/recover', (req, res) => { console.log(`[RECOVERY] ${req.body.emai
 // ==========================================
 // 4. SERVIR FRONTEND (PRODUÇÃO)
 // ==========================================
-// Serve a pasta 'dist' gerada pelo 'npm run build' na raiz do projeto
+// Serve a pasta 'dist' gerada pelo 'npm run build' na raiz do projeto.
+// Nota: Em 'type: module', __dirname aponta para 'backend', então voltamos um nível '../'
 const DIST_DIR = path.join(__dirname, '../dist');
 
 if (fs.existsSync(DIST_DIR)) {
