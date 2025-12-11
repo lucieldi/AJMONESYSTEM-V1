@@ -146,6 +146,7 @@ if (fs.existsSync(DIST_DIR)) {
     
     // Qualquer rota não-API retorna o index.html (SPA fallback)
     app.get('*', (req, res) => {
+        // Verifica se não é uma rota de API ou de arquivo estático do backend
         if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/documents')) {
             res.sendFile(path.join(DIST_DIR, 'index.html'));
         }
@@ -156,4 +157,7 @@ if (fs.existsSync(DIST_DIR)) {
 
 app.listen(PORT, () => {
     console.log(`\n🚀 Backend AJM OneSystem rodando em http://localhost:${PORT}`);
+    if (fs.existsSync(DIST_DIR)) {
+        console.log(`📱 Frontend disponível em http://localhost:${PORT}`);
+    }
 });
