@@ -5,7 +5,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import multer from 'multer';
-import nodemailer from 'nodemailer';
 
 // Configuração para __dirname em ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -15,7 +14,7 @@ const app = express();
 const PORT = 3001;
 
 // --- Middlewares ---
-app.use(cors()); // Permite CORS (útil para dev onde as portas são diferentes)
+app.use(cors()); 
 app.use(express.json({ limit: '50mb' }));
 
 // ==========================================
@@ -142,28 +141,24 @@ app.post('/api/recover', (req, res) => { console.log(`[RECOVERY] ${req.body.emai
 // ==========================================
 // 4. SERVIR FRONTEND (PRODUÇÃO)
 // ==========================================
-// Serve a pasta 'dist' gerada pelo 'npm run build' na raiz do projeto.
-// Nota: Em 'type: module', __dirname aponta para 'backend', então voltamos um nível '../'
+// Serve a pasta 'dist' gerada pelo 'npm run build'.
+// Como 'backend/server.js' está dentro de 'backend', subimos um nível para achar 'dist'.
 const DIST_DIR = path.join(__dirname, '../dist');
 
 if (fs.existsSync(DIST_DIR)) {
     console.log(`[STATIC] Servindo frontend a partir de: ${DIST_DIR}`);
     app.use(express.static(DIST_DIR));
     
-    // Qualquer rota não-API retorna o index.html (SPA fallback)
+    // SPA Fallback: Qualquer rota não-API retorna index.html
     app.get('*', (req, res) => {
-        // Verifica se não é uma rota de API ou de arquivo estático do backend
         if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/documents')) {
             res.sendFile(path.join(DIST_DIR, 'index.html'));
         }
     });
 } else {
-    console.log("[INFO] Pasta '../dist' não encontrada. Rode 'npm run build' na raiz para gerar o frontend.");
+    console.log("[INFO] Pasta 'dist' não encontrada. Em produção, execute 'npm run build' primeiro.");
 }
 
 app.listen(PORT, () => {
     console.log(`\n🚀 Backend AJM OneSystem rodando em http://localhost:${PORT}`);
-    if (fs.existsSync(DIST_DIR)) {
-        console.log(`📱 Frontend disponível em http://localhost:${PORT}`);
-    }
 });

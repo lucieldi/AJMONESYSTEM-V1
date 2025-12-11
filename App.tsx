@@ -42,7 +42,7 @@ const EMOJI_LIST = [
     '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
     '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
     '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
-    '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', 'hk',
+    '😦', '😧', '😮', '😲', '🥱', '😴', '😪', '😵', 'hk',
     '🤐', '🥴', '🤢', '🤮', '😷', '🤒', '🤕', '👻', '👽', '🤖', 
     '💩', '💤', '⭐', '🔥', '👍', '👎', '📁', '📄', '📅', '📊'
 ];
@@ -512,14 +512,11 @@ function App() {
             appSettings.showSidebar && isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:w-0 md:overflow-hidden'
         }`}
     >
-      <div className="p-4 flex items-center justify-between group">
-        <div className="flex items-center gap-2 font-medium truncate">
-          <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center text-xs text-white font-bold">A</div>
-          <span>AJM OneSystem</span>
-        </div>
-      </div>
+       <div className="h-16 flex items-center justify-center border-b border-[#333]">
+           <img src="onesystem.png" alt="AJM OneSystem" className="h-8 w-auto object-contain" />
+       </div>
 
-      <div className="px-2 space-y-1">
+      <div className="px-2 space-y-1 mt-4">
         <button className="w-full flex items-center gap-2 px-3 py-1.5 text-notion-muted hover:bg-notion-hover hover:text-notion-text rounded-md text-sm">
           <Search size={16} /> Pesquisar
         </button>
